@@ -1,4 +1,4 @@
-import { assignMissionVehicle, requestAdvance, submitExpense, submitPurchase } from "@/app/actions";
+import { assignMissionVehicle, requestAdvance, submitExpense } from "@/app/actions";
 import { PageHeader } from "@/components/page-header";
 import { ReceiptCameraInput } from "@/components/receipt-camera-input";
 import { auth } from "@/auth";
@@ -54,7 +54,6 @@ export default async function TechnicianPage() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         {isTeamLeader ? <VehicleAssignment missions={missions} vehicles={vehicles} /> : null}
         <FieldForm title="Advance payment demand" action={requestAdvance} projects={projects} missions={missions} fields="advance" />
-        <FieldForm title="Capture purchase receipts" action={submitPurchase} projects={projects} missions={missions} fields="purchase" />
         <FieldForm title="Capture expense receipts" action={submitExpense} projects={projects} missions={missions} fields="expense" />
       </div>
       <p className="mt-4 text-xs text-stone-500">Signed in as {session?.user.email}. The technician app is limited to assigned missions only.</p>
