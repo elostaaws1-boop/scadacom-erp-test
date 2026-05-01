@@ -58,8 +58,8 @@ export function canAccess(role: Role, allowed: Role[]) {
   return allowed.includes(role);
 }
 
-export function isBossIdentity(role: Role, email?: string | null) {
-  return role === "BOSS" && !!email && email.toLowerCase() === (process.env.BOSS_EMAIL ?? "boss@telecom.local").toLowerCase();
+export function isBossIdentity(role: Role, _email?: string | null) {
+  return role === "BOSS";
 }
 
 export function visibleNavigationFor(role: Role, email?: string | null) {
