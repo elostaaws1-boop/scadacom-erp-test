@@ -1,11 +1,14 @@
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { BossRoomConsole, type UnlockState } from "@/components/boss-room-console";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { T } from "@/components/translated-text";
+import { audit } from "@/lib/audit";
+import { generateMonthlyPerformanceReport } from "@/lib/monthly-report";
 import { mad } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { isBossIdentity } from "@/lib/rbac";
@@ -55,14 +58,57 @@ async function simulate(formData: FormData) {
   }
 }
 
+async function generateReport(formData: FormData) {
+  "use server";
+  const session = await auth();
+  if (!session?.user || !isBossIdentity(session.user.role, session.user.email)) notFound();
+  const month = Number(formData.get("month") ?? new Date().getMonth() + 1);
+  const year = Number(formData.get("year") ?? new Date().getFullYear());
+  const report = await generateMonthlyPerformanceReport(month, year, session.user.id);
+  await audit({ actorId: session.user.id, action: "GENERATE_MONTHLY_REPORT", entity: "MonthlyPerformanceReport", entityId: report.id, after: { month, year, status: report.status } });
+  revalidatePath("/boss-room");
+}
+
+async function lockReport(formData: FormData) {
+  "use server";
+  const session = await auth();
+  if (!session?.user || !isBossIdentity(session.user.role, session.user.email)) notFound();
+  const id = String(formData.get("id") ?? "");
+  const before = await prisma.monthlyPerformanceReport.findUniqueOrThrow({ where: { id } });
+  const report = await prisma.monthlyPerformanceReport.update({
+    where: { id },
+    data: { status: "LOCKED", lockedById: session.user.id, lockedAt: new Date() }
+  });
+  await audit({ actorId: session.user.id, action: "LOCK_MONTHLY_REPORT", entity: "MonthlyPerformanceReport", entityId: report.id, before, after: report });
+  revalidatePath("/boss-room");
+}
+
 export default async function BossRoomPage() {
   const session = await auth();
   if (!session?.user || !isBossIdentity(session.user.role, session.user.email)) notFound();
-  const projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
+  const [projects, reports] = await Promise.all([
+    prisma.project.findMany({ orderBy: { name: "asc" } }),
+    prisma.monthlyPerformanceReport.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], take: 12 })
+  ]);
   return (
     <>
       <PageHeader titleKey="pages.bossRoom.title" descriptionKey="pages.bossRoom.description" />
-      <BossRoomConsole projects={projects} unlock={unlockBossRoom} simulate={simulate} />
+      <BossRoomConsole
+        projects={projects}
+        reports={reports.map((report) => ({
+          id: report.id,
+          month: report.month,
+          year: report.year,
+          status: report.status,
+          generatedAt: report.generatedAt?.toISOString() ?? null,
+          lockedAt: report.lockedAt?.toISOString() ?? null,
+          snapshot: report.snapshot
+        }))}
+        unlock={unlockBossRoom}
+        simulate={simulate}
+        generateReport={generateReport}
+        lockReport={lockReport}
+      />
       <div className="mt-6 grid gap-4 md:grid-cols-4"><StatCard labelKey="pages.bossRoom.targetMargin" value="25%" /><StatCard labelKey="pages.bossRoom.breakEven" value={mad(0)} /><StatCard labelKey="pages.bossRoom.riskThreshold" value="12%" /><StatCard labelKey="pages.bossRoom.access" value={<T k="pages.bossRoom.bossOnly" />} /></div>
     </>
   );

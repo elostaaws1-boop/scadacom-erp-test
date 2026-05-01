@@ -104,6 +104,13 @@ enum ProfitStatus {
   LOSS
 }
 
+enum MonthlyReportStatus {
+  DRAFT
+  GENERATED
+  LOCKED
+  ARCHIVED
+}
+
 model User {
   id                 String              @id @default(cuid())
   name               String
@@ -507,6 +514,25 @@ model ProfitScenario {
   status             ProfitStatus
   createdById        String
   createdAt          DateTime     @default(now())
+}
+
+model MonthlyPerformanceReport {
+  id          String              @id @default(cuid())
+  month       Int
+  year        Int
+  periodStart DateTime
+  periodEnd   DateTime
+  status      MonthlyReportStatus @default(DRAFT)
+  generatedById String?
+  generatedAt DateTime?
+  lockedById  String?
+  lockedAt    DateTime?
+  archivedAt  DateTime?
+  snapshot    Json
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([month, year])
 }
 
 model AuditLog {
