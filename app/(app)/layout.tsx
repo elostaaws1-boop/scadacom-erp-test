@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items = visibleNavigationFor(session.user.role, session.user.email);
   const cookieStore = await cookies();
   const locale = normalizeLocale(cookieStore.get("scadacom_locale")?.value);
+  const isRtl = locale === "ar";
 
   async function logout() {
     "use server";
@@ -20,25 +21,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-field text-ink">
-      <aside className="fixed left-0 top-0 hidden h-screen w-72 border-r border-black/10 bg-white px-4 py-5 lg:block">
+      <aside className={`fixed top-0 hidden h-screen w-72 bg-white px-4 py-5 lg:block ${isRtl ? "right-0 border-l border-black/10 text-right" : "left-0 border-r border-black/10"}`}>
         <div className="px-2">
-          <img src="/scadacom-logo.png" alt="ScadaCom" className="h-14 w-auto rounded-md object-contain" />
+          <img src="/scadacom-logo.png" alt="ScadaCom" className={`h-14 w-auto rounded-md object-contain ${isRtl ? "mr-auto" : ""}`} />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mint">ScadaCom</p>
           <h1 className="mt-1 text-xl font-semibold">{translate(locale, "Telecom ERP")}</h1>
           <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Language</p>
+            <p className={`mb-2 text-xs font-semibold uppercase text-stone-500 ${isRtl ? "" : "tracking-[0.18em]"}`}>{translate(locale, "Language")}</p>
             <LanguageSwitcher currentLocale={locale} />
           </div>
         </div>
         <nav className="mt-8 grid gap-1">
           {items.map((item) => (
-            <a className="rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-field hover:text-ink" href={item.href} key={item.href}>
+            <a className={`rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-field hover:text-ink ${isRtl ? "text-right" : ""}`} href={item.href} key={item.href}>
               {translate(locale, item.label)}
             </a>
           ))}
         </nav>
       </aside>
-      <div className="lg:pl-72">
+      <div className={isRtl ? "lg:pr-72" : "lg:pl-72"}>
         <header className="sticky top-0 z-20 border-b border-black/10 bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">

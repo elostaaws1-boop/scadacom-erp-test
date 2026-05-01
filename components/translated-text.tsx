@@ -22,3 +22,7 @@ export function TranslatedText({ text }: { text: string }) {
   const locale = useClientLocale();
   return <>{translate(locale, text)}</>;
 }
+
+export function T({ text }: { text: string }) {
+  return <TranslatedText text={text} />;
+}

@@ -1,3 +1,5 @@
+import { TranslatedText } from "@/components/translated-text";
+
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     APPROVED: "bg-emerald-100 text-emerald-800",
@@ -9,5 +11,5 @@ export function StatusBadge({ status }: { status: string }) {
     OVERDUE: "bg-red-100 text-red-700"
   };
   const label = status === "PENDING" ? "PENDING VERIFICATION" : status.replaceAll("_", " ");
-  return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${map[status] ?? "bg-stone-100 text-stone-700"}`}>{label}</span>;
+  return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${map[status] ?? "bg-stone-100 text-stone-700"}`}><TranslatedText text={label} /></span>;
 }

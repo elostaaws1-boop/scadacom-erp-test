@@ -5,6 +5,7 @@ import { mad } from "@/lib/money";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
+import { T } from "@/components/translated-text";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -50,10 +51,10 @@ export default async function DashboardPage() {
       <section className="mt-6 rounded-lg border border-black/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-2 md:flex-row md:items-end">
           <div>
-            <h2 className="text-lg font-semibold">Purchase Category Analysis</h2>
-            <p className="mt-1 text-sm text-stone-600">Approved purchase spend by category, ranked highest first.</p>
+          <h2 className="text-lg font-semibold"><T text="Purchase Category Analysis" /></h2>
+            <p className="mt-1 text-sm text-stone-600"><T text="Approved purchase spend by category, ranked highest first." /></p>
           </div>
-          <p className="text-sm font-semibold text-stone-600">Total analyzed: {mad(categoryTotal)}</p>
+          <p className="text-sm font-semibold text-stone-600"><T text="Total analyzed" />: {mad(categoryTotal)}</p>
         </div>
         <div className="mt-4 grid gap-3">
           {categorySpend.length > 0 ? (
@@ -75,13 +76,13 @@ export default async function DashboardPage() {
               );
             })
           ) : (
-            <p className="rounded-md border border-dashed border-stone-300 p-4 text-sm text-stone-500">No approved purchases yet. Categories will appear here after purchases are approved.</p>
+            <p className="rounded-md border border-dashed border-stone-300 p-4 text-sm text-stone-500"><T text="No approved purchases yet. Categories will appear here after purchases are approved." /></p>
           )}
         </div>
       </section>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Recent Projects</h2>
+          <h2 className="text-lg font-semibold"><T text="Recent Projects" /></h2>
           <div className="mt-4 grid gap-3">
             {projects.map((project) => (
               <a className="rounded-md border border-black/10 p-4 hover:bg-field" href={`/projects/${project.id}`} key={project.id}>
@@ -92,13 +93,13 @@ export default async function DashboardPage() {
                   </div>
                   <StatusBadge status={project.status} />
                 </div>
-                <p className="mt-3 text-sm text-stone-600">Budget left: {mad(Number(project.allocatedBudget) - Number(project.actualCost))}</p>
+                <p className="mt-3 text-sm text-stone-600"><T text="Budget left" />: {mad(Number(project.allocatedBudget) - Number(project.actualCost))}</p>
               </a>
             ))}
           </div>
         </section>
         <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold">Morocco Tax Watch</h2>
+          <h2 className="text-lg font-semibold"><T text="Morocco Tax Watch" /></h2>
           <div className="mt-4 grid gap-3">
             {taxes.map((tax) => (
               <div className="rounded-md border border-black/10 p-4" key={tax.id}>
@@ -106,7 +107,7 @@ export default async function DashboardPage() {
                   <p className="font-semibold">{tax.type} · {tax.period}</p>
                   <StatusBadge status={tax.status} />
                 </div>
-                <p className="mt-2 text-sm text-stone-600">Remaining: {mad(Number(tax.amountDue) - Number(tax.paid))}</p>
+                <p className="mt-2 text-sm text-stone-600"><T text="Remaining" />: {mad(Number(tax.amountDue) - Number(tax.paid))}</p>
               </div>
             ))}
           </div>

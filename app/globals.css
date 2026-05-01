@@ -24,6 +24,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+html[dir="rtl"] body {
+  font-family: Tahoma, Arial, Helvetica, sans-serif;
+}
+
+html[dir="rtl"] input,
+html[dir="rtl"] select,
+html[dir="rtl"] textarea {
+  text-align: right;
+}
+
 button,
 input,
 select,
