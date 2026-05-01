@@ -1,0 +1,39 @@
+{
+  "name": "ScadaCom Technician",
+  "short_name": "ScadaCom",
+  "description": "Technician field app for ScadaCom telecom operations.",
+  "start_url": "/technician",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f8f5",
+  "theme_color": "#17201b",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Technician Portal",
+      "short_name": "Portal",
+      "url": "/technician",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add Purchase",
+      "short_name": "Purchase",
+      "url": "/technician",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+import { redirect } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { auth, signOut } from "@/auth";
+import { roleLabels, visibleNavigationFor } from "@/lib/rbac";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  const items = visibleNavigationFor(session.user.role, session.user.email);
+
+  async function logout() {
+    "use server";
+    await signOut({ redirectTo: "/login" });
+  }
+
+  return (
+    <div className="min-h-screen bg-field text-ink">
+      <aside className="fixed left-0 top-0 hidden h-screen w-72 border-r border-black/10 bg-white px-4 py-5 lg:block">
+        <div className="px-2">
+          <img src="/scadacom-logo.png" alt="ScadaCom" className="h-14 w-auto rounded-md object-contain" />
+          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mint">ScadaCom</p>
+          <h1 className="mt-1 text-xl font-semibold">Telecom ERP</h1>
+        </div>
+        <nav className="mt-8 grid gap-1">
+          {items.map((item) => (
+            <a className="rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-field hover:text-ink" href={item.href} key={item.href}>
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </aside>
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-20 border-b border-black/10 bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img src="/scadacom-logo.png" alt="ScadaCom" className="h-10 w-10 rounded-md object-cover lg:hidden" />
+              <div>
+                <p className="text-sm font-semibold">{session.user.name}</p>
+                <p className="text-xs text-stone-500">{roleLabels[session.user.role]}</p>
+              </div>
+            </div>
+            <form action={logout}>
+              <button className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-md border border-black/10" title="Sign out">
+                <LogOut size={18} />
+              </button>
+            </form>
+          </div>
+          <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            {items.map((item) => (
+              <a className="whitespace-nowrap rounded-md border border-black/10 bg-white px-3 py-2 text-sm" href={item.href} key={item.href}>
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </header>
+        <main className="px-4 py-6 lg:px-8">{children}</main>
+      </div>
+    </div>
+  );
+}

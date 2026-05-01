@@ -1,0 +1,11 @@
+.env
+.env.vercel
+.env.production
+.env.local
+.env.production.local
+.env.*.local
+.next
+node_modules
+uploads
+dev-server.out.log
+dev-server.err.log
