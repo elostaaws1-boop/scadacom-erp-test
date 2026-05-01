@@ -30,6 +30,7 @@ export const navigation = [
   { href: "/purchases", label: "Work Purchases", roles: ["BOSS", "GENERAL_MANAGER", "FINANCIAL_DEPARTMENT", "PROJECT_MANAGER", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { href: "/expenses", label: "Expenses", roles: ["BOSS", "GENERAL_MANAGER", "FINANCIAL_DEPARTMENT", "PROJECT_MANAGER", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { href: "/allowances", label: "Deployment Allowances", roles: ["BOSS", "GENERAL_MANAGER", "FINANCIAL_DEPARTMENT", "PROJECT_MANAGER", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
+  { href: "/profit-simulator", label: "Profit Simulator", roles: projectControlRoles },
   { href: "/cash", label: "Cash Control", roles: financeRoles },
   { href: "/suppliers", label: "Suppliers", roles: financeRoles },
   { href: "/taxes", label: "Taxes", roles: financeRoles },
