@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn, auth } from "@/auth";
 import { LoginFields } from "@/components/login-fields";
+import { LoginSubmitButton } from "@/components/login-submit-button";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string }> }) {
   const session = await auth();
@@ -39,9 +40,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">Email or password is incorrect.</p>
           ) : null}
           <LoginFields />
-          <button className="focus-ring w-full rounded-md bg-ink px-4 py-3 font-semibold text-white" type="submit">
-            Sign in
-          </button>
+          <LoginSubmitButton />
         </form>
       </section>
     </main>

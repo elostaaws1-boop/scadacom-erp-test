@@ -8,8 +8,10 @@ export default async function middleware(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
 
   if (!token && !isAuthRoute) {
-    const login = new URL("/login", req.nextUrl.origin);
-    login.searchParams.set("callbackUrl", req.nextUrl.href);
+    const publicOrigin = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? req.nextUrl.origin;
+    const login = new URL("/login", publicOrigin);
+    const callback = new URL(`${req.nextUrl.pathname}${req.nextUrl.search}`, publicOrigin);
+    login.searchParams.set("callbackUrl", callback.href);
     return Response.redirect(login);
   }
 
