@@ -5,10 +5,14 @@ import { isBossIdentity, navigation } from "@/lib/rbac";
 
 export default async function middleware(req: NextRequest) {
   const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth") || req.nextUrl.pathname === "/login" || req.nextUrl.pathname.startsWith("/invite/");
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
+  const publicOrigin = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? req.nextUrl.origin;
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie: new URL(publicOrigin).protocol === "https:"
+  });
 
   if (!token && !isAuthRoute) {
-    const publicOrigin = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? req.nextUrl.origin;
     const login = new URL("/login", publicOrigin);
     const callback = new URL(`${req.nextUrl.pathname}${req.nextUrl.search}`, publicOrigin);
     login.searchParams.set("callbackUrl", callback.href);
@@ -26,7 +30,7 @@ export default async function middleware(req: NextRequest) {
     }
     const protectedItem = navigation.find((item) => req.nextUrl.pathname === item.href || req.nextUrl.pathname.startsWith(`${item.href}/`));
     if (protectedItem && !protectedItem.roles.includes(role)) {
-      return Response.redirect(new URL("/dashboard", req.nextUrl.origin));
+      return Response.redirect(new URL("/dashboard", publicOrigin));
     }
   }
 }
