@@ -27,7 +27,7 @@ async function unlockBossRoom(_state: UnlockState, formData: FormData): Promise<
     data: { userId: session.user.id, email: session.user.email ?? "unknown", success: allowed, ip }
   });
 
-  return allowed ? { ok: true } : { ok: false, error: "Passcode is incorrect." };
+  return allowed ? { ok: true } : { ok: false, error: "pages.bossRoom.incorrect" };
 }
 
 async function simulate(formData: FormData) {

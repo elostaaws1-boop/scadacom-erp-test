@@ -375,6 +375,29 @@
       "access": "Access",
       "bossOnly": "Boss only"
     },
+    "bossAi": {
+      "eyebrow": "Boss intelligence",
+      "title": "SCADACOM Intelligence Assistant",
+      "description": "Ask private questions about company performance, risks, costs, suppliers, taxes, fleet, warehouse, missions, and monthly reports.",
+      "private": "Boss-only assistant. Every question is checked against the boss passcode and audited.",
+      "welcome": "Ask me what needs attention. I will use only the company data available in the database and I will say when data is missing.",
+      "assistantName": "SCADACOM Intelligence Assistant",
+      "you": "You",
+      "placeholder": "Ask a business question...",
+      "ask": "Ask assistant",
+      "asking": "Analyzing...",
+      "thinking": "Analyzing company data...",
+      "error": "The assistant could not answer right now.",
+      "model": "Model",
+      "ruleBased": "AI model is not configured, so this answer used local rule-based database analysis.",
+      "prompts": {
+        "performance": "Summarize company performance this month",
+        "redFlags": "Show biggest red flags",
+        "riskyProjects": "Which projects are risky?",
+        "reduceCosts": "Where can we reduce costs?",
+        "actionPlan": "Create action plan for next week"
+      }
+    },
     "profitSimulator": {
       "description": "Model revenue, cost, margin, break-even, and recommended pricing before saving a scenario to a project.",
       "accessRoles": "Boss, GM, PM"

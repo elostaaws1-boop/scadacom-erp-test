@@ -59,8 +59,10 @@ export function canAccess(role: Role, allowed: Role[]) {
   return allowed.includes(role);
 }
 
-export function isBossIdentity(role: Role, _email?: string | null) {
-  return role === "BOSS";
+export function isBossIdentity(role: Role, email?: string | null) {
+  const bossEmail = process.env.BOSS_EMAIL?.trim().toLowerCase();
+  if (!bossEmail) return role === "BOSS";
+  return role === "BOSS" && email?.trim().toLowerCase() === bossEmail;
 }
 
 export function visibleNavigationFor(role: Role, email?: string | null) {

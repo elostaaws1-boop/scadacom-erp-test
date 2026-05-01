@@ -375,6 +375,29 @@
       "access": "Accès",
       "bossOnly": "Patron seulement"
     },
+    "bossAi": {
+      "eyebrow": "Intelligence patron",
+      "title": "Assistant Intelligence SCADACOM",
+      "description": "Posez des questions privées sur la performance, les risques, les coûts, les fournisseurs, les taxes, la flotte, le stock, les missions et les rapports mensuels.",
+      "private": "Assistant réservé au patron. Chaque question vérifie le code patron et est auditée.",
+      "welcome": "Demandez-moi ce qui mérite votre attention. J'utiliserai uniquement les données disponibles dans la base et je signalerai les données manquantes.",
+      "assistantName": "Assistant Intelligence SCADACOM",
+      "you": "Vous",
+      "placeholder": "Posez une question business...",
+      "ask": "Demander à l'assistant",
+      "asking": "Analyse...",
+      "thinking": "Analyse des données de l'entreprise...",
+      "error": "L'assistant ne peut pas répondre pour le moment.",
+      "model": "Modèle",
+      "ruleBased": "Le modèle IA n'est pas configuré, cette réponse utilise donc l'analyse locale basée sur les données.",
+      "prompts": {
+        "performance": "Résumer la performance de l'entreprise ce mois-ci",
+        "redFlags": "Afficher les plus grands signaux d'alerte",
+        "riskyProjects": "Quels projets sont risqués ?",
+        "reduceCosts": "Où pouvons-nous réduire les coûts ?",
+        "actionPlan": "Créer un plan d'action pour la semaine prochaine"
+      }
+    },
     "profitSimulator": {
       "description": "Simulez revenu, coût, marge, seuil de rentabilité et prix recommandé avant d’enregistrer un scénario dans un projet.",
       "accessRoles": "Patron, DG, chef de projet"

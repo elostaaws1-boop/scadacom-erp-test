@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { translate, type Locale } from "@/lib/i18n";
 import type { MonthlyReportSnapshot } from "@/lib/monthly-report";
@@ -33,6 +33,12 @@ type MonthlyReportOption = {
   generatedAt: string | null;
   lockedAt: string | null;
   snapshot: unknown;
+};
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  meta?: string;
 };
 
 export function BossRoomConsole({ projects, reports, unlock, simulate, generateReport, lockReport }: BossRoomConsoleProps) {
@@ -87,7 +93,112 @@ export function BossRoomConsole({ projects, reports, unlock, simulate, generateR
         <input name="manualCost" type="number" step="0.01" min="0" placeholder={translate(locale, "pages.bossRoom.manualCostMad")} required className="rounded-md border border-stone-300 px-3 py-3" />
         <ScenarioButton />
       </form>
+      <AiAssistantPanel passcode={passcode} />
       <MonthlyReportsPanel reports={reports} generateReport={generateReport} lockReport={lockReport} />
+    </section>
+  );
+}
+
+function AiAssistantPanel({ passcode }: { passcode: string }) {
+  const locale = useClientLocale();
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content: translate(locale, "pages.bossAi.welcome"),
+      meta: translate(locale, "pages.bossAi.private")
+    }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const prompts = [
+    translate(locale, "pages.bossAi.prompts.performance"),
+    translate(locale, "pages.bossAi.prompts.redFlags"),
+    translate(locale, "pages.bossAi.prompts.riskyProjects"),
+    translate(locale, "pages.bossAi.prompts.reduceCosts"),
+    translate(locale, "pages.bossAi.prompts.actionPlan")
+  ];
+
+  async function askAssistant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = question.trim();
+    if (!trimmed || loading) return;
+    setError("");
+    setLoading(true);
+    setQuestion("");
+    setMessages((current) => [...current, { role: "user", content: trimmed }]);
+
+    try {
+      const response = await fetch("/api/boss-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed, passcode, locale })
+      });
+      const payload = (await response.json().catch(() => null)) as { answer?: string; model?: string; usedFallback?: boolean; error?: string } | null;
+      if (!response.ok || !payload?.answer) throw new Error(payload?.error || translate(locale, "pages.bossAi.error"));
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: payload.answer ?? "",
+          meta: payload.usedFallback ? translate(locale, "pages.bossAi.ruleBased") : `${translate(locale, "pages.bossAi.model")}: ${payload.model}`
+        }
+      ]);
+    } catch (assistantError) {
+      setError(assistantError instanceof Error ? assistantError.message : translate(locale, "pages.bossAi.error"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">{translate(locale, "pages.bossAi.eyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">{translate(locale, "pages.bossAi.title")}</h2>
+          <p className="mt-1 text-sm text-stone-600">{translate(locale, "pages.bossAi.description")}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {prompts.map((prompt) => (
+          <button
+            className="rounded-full border border-black/10 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-mint hover:text-mint"
+            key={prompt}
+            onClick={() => setQuestion(prompt)}
+            type="button"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto rounded-lg bg-field p-3">
+        {messages.map((message, index) => (
+          <div className={`rounded-lg border border-black/10 p-3 ${message.role === "user" ? "ms-auto max-w-3xl bg-white" : "me-auto max-w-4xl bg-emerald-50"}`} key={`${message.role}-${index}`}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {message.role === "user" ? translate(locale, "pages.bossAi.you") : translate(locale, "pages.bossAi.assistantName")}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{message.content}</p>
+            {message.meta ? <p className="mt-2 text-xs text-stone-500">{message.meta}</p> : null}
+          </div>
+        ))}
+        {loading ? <p className="rounded-lg border border-black/10 bg-white p-3 text-sm font-medium text-stone-600">{translate(locale, "pages.bossAi.thinking")}</p> : null}
+      </div>
+
+      <form className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={askAssistant}>
+        <textarea
+          className="min-h-24 rounded-md border border-stone-300 px-3 py-3"
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder={translate(locale, "pages.bossAi.placeholder")}
+          value={question}
+        />
+        <button className="rounded-md bg-ink px-5 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-70" disabled={loading || !question.trim()} type="submit">
+          {loading ? translate(locale, "pages.bossAi.asking") : translate(locale, "pages.bossAi.ask")}
+        </button>
+      </form>
+      {error ? <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p> : null}
     </section>
   );
 }
