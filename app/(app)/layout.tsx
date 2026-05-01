@@ -25,6 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <img src="/scadacom-logo.png" alt="ScadaCom" className="h-14 w-auto rounded-md object-contain" />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mint">ScadaCom</p>
           <h1 className="mt-1 text-xl font-semibold">{translate(locale, "Telecom ERP")}</h1>
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Language</p>
+            <LanguageSwitcher currentLocale={locale} />
+          </div>
         </div>
         <nav className="mt-8 grid gap-1">
           {items.map((item) => (
