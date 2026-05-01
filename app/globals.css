@@ -34,6 +34,31 @@ html[dir="rtl"] textarea {
   text-align: right;
 }
 
+[data-app-dir="rtl"] .app-sidebar {
+  right: 0;
+  left: auto;
+  border-left: 1px solid rgb(0 0 0 / 0.1);
+  text-align: right;
+}
+
+[data-app-dir="ltr"] .app-sidebar {
+  right: auto;
+  left: 0;
+  border-right: 1px solid rgb(0 0 0 / 0.1);
+}
+
+@media (min-width: 1024px) {
+  [data-app-dir="rtl"] .app-content {
+    padding-right: 18rem;
+    padding-left: 0;
+  }
+
+  [data-app-dir="ltr"] .app-content {
+    padding-right: 0;
+    padding-left: 18rem;
+  }
+}
+
 button,
 input,
 select,

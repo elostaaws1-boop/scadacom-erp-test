@@ -20,8 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen bg-field text-ink">
-      <aside className={`fixed top-0 hidden h-screen w-72 bg-white px-4 py-5 lg:block ${isRtl ? "right-0 border-l border-black/10 text-right" : "left-0 border-r border-black/10"}`}>
+    <div className="min-h-screen bg-field text-ink" data-app-dir={isRtl ? "rtl" : "ltr"}>
+      <aside className="app-sidebar fixed top-0 hidden h-screen w-72 bg-white px-4 py-5 lg:block">
         <div className="px-2">
           <img src="/scadacom-logo.png" alt="ScadaCom" className={`h-14 w-auto rounded-md object-contain ${isRtl ? "mr-auto" : ""}`} />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mint">ScadaCom</p>
@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
       </aside>
-      <div className={isRtl ? "lg:pr-72" : "lg:pl-72"}>
+      <div className="app-content">
         <header className="sticky top-0 z-20 border-b border-black/10 bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">

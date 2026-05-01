@@ -9,7 +9,9 @@ function currentLocale() {
 }
 
 export function useClientLocale() {
-  const [locale, setLocale] = useState<ReturnType<typeof normalizeLocale>>("en");
+  const [locale, setLocale] = useState<ReturnType<typeof normalizeLocale>>(() =>
+    typeof document === "undefined" ? "en" : currentLocale(),
+  );
 
   useEffect(() => {
     setLocale(currentLocale());
