@@ -19,8 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-field text-ink" data-app-dir={isRtl ? "rtl" : "ltr"}>
-      <aside className="app-sidebar fixed top-0 hidden h-screen w-72 bg-white px-4 py-5 lg:block">
-        <div className="px-2">
+      <aside className="app-sidebar fixed top-0 hidden h-screen w-72 flex-col overflow-hidden bg-white px-4 py-5 lg:flex">
+        <div className="shrink-0 px-2">
           <img src="/scadacom-logo.png" alt="ScadaCom" className={`h-14 w-auto rounded-md object-contain ${isRtl ? "mr-auto" : ""}`} />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-mint">ScadaCom</p>
           <h1 className="mt-1 text-xl font-semibold">{t("app.product")}</h1>
@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <LanguageSwitcher currentLocale={locale} />
           </div>
         </div>
-        <nav className="mt-8 grid gap-1">
+        <nav className="mt-8 grid min-h-0 flex-1 gap-1 overflow-y-auto overscroll-contain pb-6 pr-1">
           {items.map((item) => (
             <a className={`rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-field hover:text-ink ${isRtl ? "text-right" : ""}`} href={item.href} key={item.href}>
               {t(item.labelKey)}
