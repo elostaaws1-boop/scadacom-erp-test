@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { T } from "@/components/translated-text";
 import { mad } from "@/lib/money";
 import { projectScopeWhere } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
@@ -13,14 +14,14 @@ export default async function ProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Projects"
-        description="Contract value, allocated budget, committed cost, actual cost, and remaining budget are tracked here."
-        action={<a className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" href="/projects/new"><Plus size={16} /> New project</a>}
+        titleKey="pages.projects.title"
+        descriptionKey="pages.projects.description"
+        action={<a className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" href="/projects/new"><Plus size={16} /> <T k="pages.projects.new" /></a>}
       />
       <DataTable>
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="bg-field text-xs uppercase text-stone-500">
-            <tr><th className="px-4 py-3">Project</th><th>Client</th><th>Technology</th><th>Budget</th><th>Actual</th><th>Remaining</th><th>Status</th></tr>
+            <tr><th className="px-4 py-3"><T k="pages.projects.tableProject" /></th><th><T k="pages.projects.client" /></th><th><T k="pages.projects.technology" /></th><th><T k="pages.projects.budget" /></th><th><T k="pages.projects.actual" /></th><th><T k="pages.projects.remaining" /></th><th><T k="common.fields.status" /></th></tr>
           </thead>
           <tbody>
             {projects.map((project) => (

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import { PwaRegister } from "@/components/pwa-register";
-import { normalizeLocale } from "@/lib/i18n";
+import { getCurrentLocale } from "@/lib/i18n-server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,8 +27,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const cookieStore = await cookies();
-  const locale = normalizeLocale(cookieStore.get("scadacom_locale")?.value);
+  const locale = await getCurrentLocale();
 
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"}>

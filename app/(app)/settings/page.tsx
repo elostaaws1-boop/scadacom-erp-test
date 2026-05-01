@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   ]);
   return (
     <>
-      <PageHeader title="Settings" description="No public registration. Access is admin-created through one-time expiring invite links." />
+      <PageHeader titleKey="pages.settings.title" descriptionKey="pages.settings.description" />
       <InviteForm projects={projects} />
       <div className="grid gap-3">
         {invites.map((invite) => <div className="grid gap-2 rounded-lg border border-black/10 bg-white p-4 text-sm shadow-sm md:grid-cols-5" key={invite.id}><strong>{invite.email}</strong><span>{roleLabels[invite.role]}</span><span>{invite.projects.map((link) => link.project.name).join(", ") || "No project scope"}</span><span>Expires {invite.expiresAt.toLocaleString("fr-MA")}</span><span>{invite.usedAt ? "Used" : "Open"}</span></div>)}

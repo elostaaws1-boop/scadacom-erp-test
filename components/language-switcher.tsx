@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { localeLabels, locales, type Locale } from "@/lib/i18n";
+import { useTranslation } from "@/components/translated-text";
 
 export function LanguageSwitcher({ currentLocale }: { currentLocale: Locale }) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <select
@@ -14,8 +16,8 @@ export function LanguageSwitcher({ currentLocale }: { currentLocale: Locale }) {
         document.cookie = `scadacom_locale=${event.target.value}; path=/; max-age=31536000; SameSite=Lax`;
         router.refresh();
       }}
-      aria-label="Language"
-      title="Language"
+      aria-label={t("app.language")}
+      title={t("app.language")}
     >
       {locales.map((locale) => (
         <option value={locale} key={locale}>

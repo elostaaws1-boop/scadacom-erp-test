@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { normalizeLocale, translate } from "@/lib/i18n";
+import { normalizeLocale, t, type TranslationValues } from "@/lib/i18n";
 
 function currentLocale() {
   const match = document.cookie.match(/(?:^|; )scadacom_locale=([^;]+)/);
@@ -20,11 +20,20 @@ export function useClientLocale() {
   return locale;
 }
 
-export function TranslatedText({ text }: { text: string }) {
+export function useTranslation() {
   const locale = useClientLocale();
-  return <>{translate(locale, text)}</>;
+  return {
+    locale,
+    dir: locale === "ar" ? "rtl" : "ltr",
+    t: (key: string, values?: TranslationValues) => t(locale, key, values)
+  };
 }
 
-export function T({ text }: { text: string }) {
-  return <TranslatedText text={text} />;
+export function TranslatedText({ k, values }: { k: string; values?: TranslationValues }) {
+  const { t: translateKey } = useTranslation();
+  return <>{translateKey(k, values)}</>;
+}
+
+export function T({ k, values }: { k: string; values?: TranslationValues }) {
+  return <TranslatedText k={k} values={values} />;
 }

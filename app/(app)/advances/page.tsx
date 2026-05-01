@@ -12,7 +12,7 @@ export default async function AdvancesPage() {
   const advances = await prisma.advanceRequest.findMany({ where: projectIds ? { projectId: { in: projectIds } } : {}, include: { project: true }, orderBy: { createdAt: "desc" } });
   return (
     <>
-      <PageHeader title="Advance Requests" description="Advance requests pass project budget and company cash checks. Super Admin can override blocked cases." />
+      <PageHeader titleKey="pages.approvals.advanceTitle" descriptionKey="pages.approvals.advanceDescription" />
       <div className="grid gap-4">
         {advances.map((item) => (
           <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm" key={item.id}>

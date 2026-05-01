@@ -37,16 +37,16 @@ export function ProfitSimulatorConsole({ projects, run }: ProfitSimulatorConsole
     <section className="space-y-5">
       <form action={action} className="grid max-w-4xl gap-3 rounded-lg border border-black/10 bg-white p-5 shadow-sm md:grid-cols-2">
         <select name="projectId" className="rounded-md border border-stone-300 px-3 py-3">
-          <option value="">{translate(locale, "Run without saving")}</option>
+          <option value="">{translate(locale, "pages.bossRoom.runWithoutSaving")}</option>
           {projects.map((project) => (
             <option value={project.id} key={project.id}>
               {project.name}
             </option>
           ))}
         </select>
-        <input name="name" placeholder={translate(locale, "Scenario name")} className="rounded-md border border-stone-300 px-3 py-3" />
-        <input name="revenue" type="number" step="0.01" min="0" placeholder={translate(locale, "Revenue MAD")} required className="rounded-md border border-stone-300 px-3 py-3" />
-        <input name="manualCost" type="number" step="0.01" min="0" placeholder={translate(locale, "Manual cost MAD")} required className="rounded-md border border-stone-300 px-3 py-3" />
+        <input name="name" placeholder={translate(locale, "pages.bossRoom.scenarioName")} className="rounded-md border border-stone-300 px-3 py-3" />
+        <input name="revenue" type="number" step="0.01" min="0" placeholder={translate(locale, "pages.bossRoom.revenueMad")} required className="rounded-md border border-stone-300 px-3 py-3" />
+        <input name="manualCost" type="number" step="0.01" min="0" placeholder={translate(locale, "pages.bossRoom.manualCostMad")} required className="rounded-md border border-stone-300 px-3 py-3" />
         <ScenarioButton />
       </form>
 
@@ -54,10 +54,10 @@ export function ProfitSimulatorConsole({ projects, run }: ProfitSimulatorConsole
 
       {state.result ? (
         <div className="grid max-w-4xl gap-4 md:grid-cols-4">
-          <ResultCard label={translate(locale, "Profit")} value={money.format(state.result.profit)} />
-          <ResultCard label={translate(locale, "Margin")} value={`${state.result.marginPercent.toFixed(2)}%`} />
-          <ResultCard label={translate(locale, "Break-even")} value={money.format(state.result.breakEven)} />
-          <ResultCard label={translate(locale, "Recommended price")} value={money.format(state.result.recommendedPricing)} detail={state.result.saved ? translate(locale, "Saved to project") : translate(locale, "Not saved")} />
+          <ResultCard label={translate(locale, "pages.bossRoom.profit")} value={money.format(state.result.profit)} />
+          <ResultCard label={translate(locale, "pages.bossRoom.margin")} value={`${state.result.marginPercent.toFixed(2)}%`} />
+          <ResultCard label={translate(locale, "pages.bossRoom.breakEven")} value={money.format(state.result.breakEven)} />
+          <ResultCard label={translate(locale, "pages.bossRoom.recommendedPrice")} value={money.format(state.result.recommendedPricing)} detail={state.result.saved ? translate(locale, "pages.bossRoom.savedToProject") : translate(locale, "pages.bossRoom.notSaved")} />
         </div>
       ) : null}
     </section>
@@ -80,7 +80,7 @@ function ScenarioButton() {
 
   return (
     <button className="rounded-md bg-ink px-4 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-70 md:col-span-2" disabled={pending} type="submit">
-      {pending ? translate(locale, "Running") : translate(locale, "Run simulator")}
+      {pending ? translate(locale, "pages.bossRoom.running") : translate(locale, "pages.bossRoom.runSimulator")}
     </button>
   );
 }

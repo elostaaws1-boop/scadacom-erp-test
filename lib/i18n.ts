@@ -1,6 +1,10 @@
-export const locales = ["en", "fr", "ar"] as const;
+import en from "@/locales/en.json";
+import fr from "@/locales/fr.json";
+import ar from "@/locales/ar.json";
 
+export const locales = ["en", "fr", "ar"] as const;
 export type Locale = (typeof locales)[number];
+export type TranslationValues = Record<string, string | number>;
 
 export const localeLabels: Record<Locale, string> = {
   en: "EN",
@@ -8,265 +12,47 @@ export const localeLabels: Record<Locale, string> = {
   ar: "AR"
 };
 
-const dictionary: Record<Locale, Record<string, string>> = {
-  en: {},
-  fr: {
-    Language: "Langue",
-    Dashboard: "Tableau de bord",
-    Projects: "Projets",
-    Missions: "Missions",
-    Teams: "Equipes",
-    Employees: "Employes",
-    "Technician Portal": "Portail technicien",
-    "Advance Requests": "Demandes d'avance",
-    "Work Purchases": "Achats travaux",
-    Expenses: "Depenses",
-    "Deployment Allowances": "Indemnites de deplacement",
-    "Profit Simulator": "Simulateur de profit",
-    "Cash Control": "Controle de caisse",
-    Suppliers: "Fournisseurs",
-    Taxes: "Taxes",
-    Warehouse: "Stock",
-    Fleet: "Flotte",
-    "Excel Imports": "Imports Excel",
-    Reports: "Rapports",
-    "Boss Profit Room": "Salle profit patron",
-    Settings: "Parametres",
-    Boss: "Patron",
-    "General Manager": "Directeur general",
-    "Financial Department": "Departement financier",
-    "Project Manager": "Chef de projet",
-    "Team Leader": "Chef d'equipe",
-    Technician: "Technicien",
-    "Warehouse Manager": "Responsable stock",
-    "Fleet Manager": "Responsable flotte",
-    "Legacy Super Admin": "Super admin historique",
-    "Legacy Admin": "Admin historique",
-    "Legacy Accountant": "Comptable historique",
-    "Telecom ERP": "ERP Telecom",
-    "Sign out": "Se deconnecter",
-    "Private access": "Acces prive",
-    "Enter boss passcode": "Entrer le code patron",
-    "This room stays locked even after normal login.": "Cette salle reste verrouillee meme apres la connexion normale.",
-    Passcode: "Code secret",
-    "Passcode is incorrect.": "Code secret incorrect.",
-    "Unlocking...": "Deverrouillage...",
-    "Unlock Boss Room": "Deverrouiller la salle patron",
-    "Boss room unlocked for this page.": "Salle patron deverrouillee pour cette page.",
-    "Run without saving": "Executer sans enregistrer",
-    "Scenario name": "Nom du scenario",
-    "Revenue MAD": "Revenu MAD",
-    "Manual cost MAD": "Cout manuel MAD",
-    "Run scenario": "Executer le scenario",
-    Running: "Execution",
-    "Run simulator": "Executer le simulateur",
-    Profit: "Profit",
-    Margin: "Marge",
-    "Break-even": "Seuil de rentabilite",
-    "Recommended price": "Prix recommande",
-    "Saved to project": "Enregistre dans le projet",
-    "Not saved": "Non enregistre",
-    "Target margin": "Marge cible",
-    "Risk threshold": "Seuil de risque",
-    Access: "Acces",
-    "Live control center for cash, approvals, project cost, and risk.": "Centre de controle en direct pour la tresorerie, les approbations, les couts projet et les risques.",
-    "Advance requests pass project budget and company cash checks. Super Admin can override blocked cases.": "Les demandes d'avance passent les controles du budget projet et de la tresorerie. Le super admin peut debloquer les cas bloques.",
-    "Auto-calculated as mission days multiplied by each technician's 152, 160, or 175 MAD rate. No receipt required.": "Calcule automatiquement selon les jours de mission multiplies par le taux de 152, 160 ou 175 MAD de chaque technicien. Aucun recu requis.",
-    "Confidential Boss-only space. Passcode required even after login.": "Espace confidentiel reserve au patron. Code requis meme apres connexion.",
-    "Every payment must pass company cash control and, when linked, project budget control.": "Chaque paiement doit passer le controle de tresorerie et, si lie a un projet, le controle budgetaire.",
-    "Salary and deployment allowance rate are maintained per employee.": "Le salaire et le taux d'indemnite de deplacement sont geres par employe.",
-    "Pending expenses never affect project cost. Food, hotel, and personal expenses are blocked unless explicitly overridden.": "Les depenses en attente n'affectent jamais le cout projet. Nourriture, hotel et depenses personnelles sont bloquees sauf derogation explicite.",
-    "Fleet Operations": "Operations flotte",
-    "Vehicle registry, assignment, mileage, fuel tracking, location, GPS-ready fields, and maintenance alerts.": "Registre vehicules, affectation, kilometrage, carburant, localisation, champs GPS et alertes de maintenance.",
-    "Missions lock the team list to prevent ghost workers. End date can stay empty until the mission is completed.": "Les missions verrouillent la liste de l'equipe pour eviter les travailleurs fantomes. La date de fin peut rester vide jusqu'a cloture.",
-    "Model revenue, cost, margin, break-even, and recommended pricing before saving a scenario to a project.": "Simulez revenu, cout, marge, seuil de rentabilite et prix recommande avant d'enregistrer un scenario dans un projet.",
-    "Fuel, péage, paper copies, duct tape, gloves, screws, connectors, tools, and emergency materials must be tracked and approved.": "Carburant, peage, copies papier, ruban adhesif, gants, vis, connecteurs, outils et materiel d'urgence doivent etre suivis et approuves.",
-    "Profit per project, expenses, purchases, supplier debt, taxes, fleet cost, and cash flow.": "Profit par projet, depenses, achats, dettes fournisseurs, taxes, cout flotte et cash-flow.",
-    "No public registration. Access is admin-created through one-time expiring invite links.": "Pas d'inscription publique. L'acces est cree par admin via des liens d'invitation uniques et expirables.",
-    "Supplier debt, unpaid invoices, due dates, and aging exposure.": "Dettes fournisseurs, factures impayees, echeances et anciennete des dettes.",
-    "Morocco TVA, CNSS, IR, and IS obligations with due-date alerts.": "Obligations TVA, CNSS, IR et IS au Maroc avec alertes d'echeance.",
-    "Create operational teams. Mission creation snapshots the team into a locked worker list.": "Creez des equipes operationnelles. La creation de mission fige l'equipe dans une liste verrouillee.",
-    "Technician App": "Application technicien",
-    "Limited field access for assigned missions, vehicle assignment, receipt capture, and advance payment demands.": "Acces terrain limite aux missions assignees, vehicule affecte, capture des recus et demandes d'avance.",
-    "Inventory quantity, stock movement history, project links, and low-stock visibility.": "Quantite en stock, historique des mouvements, liens projets et visibilite des faibles stocks.",
-    "Company cash": "Tresorerie entreprise",
-    "Bank and cash box combined": "Banque et caisse combinees",
-    "Open project value": "Valeur des projets ouverts",
-    "Approved cost": "Cout approuve",
-    "Pending items are excluded": "Les elements en attente sont exclus",
-    "Pending approvals": "Approbations en attente",
-    "Purchases, expenses, advances": "Achats, depenses, avances",
-    "Purchase Category Analysis": "Analyse des categories d'achat",
-    "Approved purchase spend by category, ranked highest first.": "Depenses d'achat approuvees par categorie, classees du plus eleve au plus bas.",
-    "Total analyzed": "Total analyse",
-    "Recent Projects": "Projets recents",
-    "Budget left": "Budget restant",
-    "Morocco Tax Watch": "Suivi fiscal Maroc",
-    Remaining: "Restant",
-    "No approved purchases yet. Categories will appear here after purchases are approved.": "Aucun achat approuve pour le moment. Les categories apparaitront ici apres approbation.",
-    "PENDING VERIFICATION": "EN ATTENTE DE VERIFICATION",
-    APPROVED: "APPROUVE",
-    "PARTIALLY APPROVED": "PARTIELLEMENT APPROUVE",
-    REJECTED: "REJETE",
-    ACTIVE: "ACTIF",
-    COMPLETED: "TERMINE",
-    OVERDUE: "EN RETARD"
-  },
-  ar: {
-    Language: "اللغة",
-    Dashboard: "لوحة التحكم",
-    Projects: "المشاريع",
-    Missions: "المهام",
-    Teams: "الفرق",
-    Employees: "الموظفون",
-    "Technician Portal": "بوابة التقني",
-    "Advance Requests": "طلبات السلفة",
-    "Work Purchases": "مشتريات العمل",
-    Expenses: "المصاريف",
-    "Deployment Allowances": "تعويضات التنقل",
-    "Profit Simulator": "محاكي الربح",
-    "Cash Control": "مراقبة الصندوق",
-    Suppliers: "الموردون",
-    Taxes: "الضرائب",
-    Warehouse: "المخزون",
-    Fleet: "الأسطول",
-    "Excel Imports": "استيراد Excel",
-    Reports: "التقارير",
-    "Boss Profit Room": "غرفة أرباح المدير",
-    Settings: "الإعدادات",
-    Boss: "المدير",
-    "General Manager": "المدير العام",
-    "Financial Department": "القسم المالي",
-    "Project Manager": "مدير المشروع",
-    "Team Leader": "رئيس الفريق",
-    Technician: "تقني",
-    "Warehouse Manager": "مسؤول المخزون",
-    "Fleet Manager": "مسؤول الأسطول",
-    "Legacy Super Admin": "مشرف عام قديم",
-    "Legacy Admin": "مشرف قديم",
-    "Legacy Accountant": "محاسب قديم",
-    "Telecom ERP": "نظام تسيير الاتصالات",
-    "Sign out": "تسجيل الخروج",
-    "Private access": "دخول خاص",
-    "Enter boss passcode": "أدخل رمز المدير",
-    "This room stays locked even after normal login.": "هذه الغرفة تبقى مقفلة حتى بعد تسجيل الدخول العادي.",
-    Passcode: "الرمز السري",
-    "Passcode is incorrect.": "الرمز السري غير صحيح.",
-    "Unlocking...": "جاري الفتح...",
-    "Unlock Boss Room": "فتح غرفة المدير",
-    "Boss room unlocked for this page.": "تم فتح غرفة المدير لهذه الصفحة.",
-    "Run without saving": "تشغيل بدون حفظ",
-    "Scenario name": "اسم السيناريو",
-    "Revenue MAD": "المداخيل بالدرهم",
-    "Manual cost MAD": "التكلفة بالدرهم",
-    "Run scenario": "تشغيل السيناريو",
-    Running: "جاري التشغيل",
-    "Run simulator": "تشغيل المحاكي",
-    Profit: "الربح",
-    Margin: "الهامش",
-    "Break-even": "نقطة التعادل",
-    "Recommended price": "السعر المقترح",
-    "Saved to project": "تم الحفظ في المشروع",
-    "Not saved": "غير محفوظ",
-    "Target margin": "الهامش المستهدف",
-    "Risk threshold": "حد الخطر",
-    Access: "الصلاحية",
-    "Live control center for cash, approvals, project cost, and risk.": "مركز متابعة مباشر للصندوق والموافقات وتكاليف المشاريع والمخاطر.",
-    "Advance requests pass project budget and company cash checks. Super Admin can override blocked cases.": "طلبات السلفة تمر عبر مراقبة ميزانية المشروع وسيولة الشركة. يمكن للمشرف العام تجاوز الحالات المرفوضة.",
-    "Auto-calculated as mission days multiplied by each technician's 152, 160, or 175 MAD rate. No receipt required.": "تحسب تلقائيا حسب أيام المهمة مضروبة في تعويض كل تقني 152 أو 160 أو 175 درهم. لا تحتاج إلى وصل.",
-    "Confidential Boss-only space. Passcode required even after login.": "مساحة سرية خاصة بالمدير. الرمز مطلوب حتى بعد تسجيل الدخول.",
-    "Every payment must pass company cash control and, when linked, project budget control.": "كل دفعة يجب أن تمر عبر مراقبة الصندوق، وعند ربطها بمشروع تمر أيضا عبر مراقبة ميزانية المشروع.",
-    "Salary and deployment allowance rate are maintained per employee.": "يتم تدبير الراتب وتعويض التنقل لكل موظف.",
-    "Pending expenses never affect project cost. Food, hotel, and personal expenses are blocked unless explicitly overridden.": "المصاريف المعلقة لا تؤثر على تكلفة المشروع. الأكل والفندق والمصاريف الشخصية ممنوعة إلا بتجاوز صريح.",
-    "Fleet Operations": "عمليات الأسطول",
-    "Vehicle registry, assignment, mileage, fuel tracking, location, GPS-ready fields, and maintenance alerts.": "سجل المركبات، التعيين، الكيلومترات، تتبع الوقود، الموقع، حقول GPS وتنبيهات الصيانة.",
-    "Missions lock the team list to prevent ghost workers. End date can stay empty until the mission is completed.": "المهام تقفل لائحة الفريق لمنع العمال الوهميين. يمكن ترك تاريخ النهاية فارغا حتى اكتمال المهمة.",
-    "Model revenue, cost, margin, break-even, and recommended pricing before saving a scenario to a project.": "محاكاة المداخيل والتكلفة والهامش ونقطة التعادل والسعر المقترح قبل حفظ السيناريو في المشروع.",
-    "Fuel, péage, paper copies, duct tape, gloves, screws, connectors, tools, and emergency materials must be tracked and approved.": "الوقود، الأداء الطرقي، النسخ الورقية، الشريط اللاصق، القفازات، البراغي، الموصلات، الأدوات ومواد الطوارئ يجب تتبعها والموافقة عليها.",
-    "Profit per project, expenses, purchases, supplier debt, taxes, fleet cost, and cash flow.": "الربح حسب المشروع، المصاريف، المشتريات، ديون الموردين، الضرائب، تكلفة الأسطول والتدفق النقدي.",
-    "No public registration. Access is admin-created through one-time expiring invite links.": "لا يوجد تسجيل عمومي. يتم إنشاء الدخول من طرف الإدارة عبر روابط دعوة مؤقتة ولمرة واحدة.",
-    "Supplier debt, unpaid invoices, due dates, and aging exposure.": "ديون الموردين، الفواتير غير المؤداة، تواريخ الاستحقاق وعمر الديون.",
-    "Morocco TVA, CNSS, IR, and IS obligations with due-date alerts.": "التزامات TVA و CNSS و IR و IS في المغرب مع تنبيهات آجال الأداء.",
-    "Create operational teams. Mission creation snapshots the team into a locked worker list.": "إنشاء فرق عملياتية. عند إنشاء مهمة يتم تثبيت الفريق في لائحة عمال مقفلة.",
-    "Technician App": "تطبيق التقني",
-    "Limited field access for assigned missions, vehicle assignment, receipt capture, and advance payment demands.": "دخول ميداني محدود للمهام المعينة، تعيين المركبة، تصوير الوصولات وطلبات السلفة.",
-    "Inventory quantity, stock movement history, project links, and low-stock visibility.": "كمية المخزون، تاريخ حركات المخزون، روابط المشاريع ووضوح نقص المخزون.",
-    "Company cash": "سيولة الشركة",
-    "Bank and cash box combined": "إجمالي البنك والصندوق",
-    "Open project value": "قيمة المشاريع المفتوحة",
-    "Approved cost": "التكلفة المعتمدة",
-    "Pending items are excluded": "العناصر قيد الانتظار غير محسوبة",
-    "Pending approvals": "الموافقات المعلقة",
-    "Purchases, expenses, advances": "المشتريات والمصاريف والسلف",
-    "Purchase Category Analysis": "تحليل فئات المشتريات",
-    "Approved purchase spend by category, ranked highest first.": "المشتريات المعتمدة حسب الفئة مرتبة من الأعلى.",
-    "Total analyzed": "إجمالي التحليل",
-    "Recent Projects": "آخر المشاريع",
-    "Budget left": "الميزانية المتبقية",
-    "Morocco Tax Watch": "متابعة الضرائب بالمغرب",
-    Remaining: "المتبقي",
-    "No approved purchases yet. Categories will appear here after purchases are approved.": "لا توجد مشتريات معتمدة بعد. ستظهر الفئات هنا بعد الموافقة على المشتريات.",
-    "PENDING VERIFICATION": "في انتظار التحقق",
-    APPROVED: "معتمد",
-    "PARTIALLY APPROVED": "معتمد جزئيا",
-    REJECTED: "مرفوض",
-    ACTIVE: "نشط",
-    COMPLETED: "مكتمل",
-    OVERDUE: "متأخر"
-  }
-};
+const dictionaries = { en, fr, ar } as const;
 
 export function normalizeLocale(value?: string | null): Locale {
   return locales.includes(value as Locale) ? (value as Locale) : "en";
 }
 
-export function translate(locale: Locale, text: string) {
-  const translated = dictionary[locale][text] ?? text;
-  return locale === "ar" ? repairMojibake(translated) : translated;
+export function t(locale: Locale, key: string, values?: TranslationValues) {
+  const value = lookup(dictionaries[locale], key);
+  const fallback = lookup(dictionaries.en, key);
+  const raw = value ?? fallback ?? (process.env.NODE_ENV === "development" ? `[missing:${key}]` : key);
+  return interpolate(String(raw), values);
 }
 
-const cp1252: Record<number, number> = {
-  0x20ac: 0x80,
-  0x201a: 0x82,
-  0x0192: 0x83,
-  0x201e: 0x84,
-  0x2026: 0x85,
-  0x2020: 0x86,
-  0x2021: 0x87,
-  0x02c6: 0x88,
-  0x2030: 0x89,
-  0x0160: 0x8a,
-  0x2039: 0x8b,
-  0x0152: 0x8c,
-  0x017d: 0x8e,
-  0x2018: 0x91,
-  0x2019: 0x92,
-  0x201c: 0x93,
-  0x201d: 0x94,
-  0x2022: 0x95,
-  0x2013: 0x96,
-  0x2014: 0x97,
-  0x02dc: 0x98,
-  0x2122: 0x99,
-  0x0161: 0x9a,
-  0x203a: 0x9b,
-  0x0153: 0x9c,
-  0x017e: 0x9e,
-  0x0178: 0x9f
-};
+export function translate(locale: Locale, key: string, values?: TranslationValues) {
+  return t(locale, key, values);
+}
 
-function repairMojibake(value: string) {
-  if (!/[ÃØÙ]/.test(value)) return value;
+export function hasTranslation(locale: Locale, key: string) {
+  return lookup(dictionaries[locale], key) != null;
+}
 
-  try {
-    const bytes = Uint8Array.from(
-      Array.from(value, (char) => {
-        const code = char.charCodeAt(0);
-        return code <= 0xff ? code : cp1252[code] ?? code;
-      })
-    );
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return value;
-  }
+export function allTranslationKeys(locale: Locale = "en") {
+  return flattenKeys(dictionaries[locale]);
+}
+
+function lookup(source: unknown, key: string) {
+  return key.split(".").reduce<unknown>((current, part) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[part];
+  }, source);
+}
+
+function interpolate(value: string, values?: TranslationValues) {
+  if (!values) return value;
+  return value.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(values[name] ?? ""));
+}
+
+function flattenKeys(source: unknown, prefix = ""): string[] {
+  if (!source || typeof source !== "object") return [];
+  return Object.entries(source as Record<string, unknown>).flatMap(([key, value]) => {
+    const nextKey = prefix ? `${prefix}.${key}` : key;
+    return value && typeof value === "object" ? flattenKeys(value, nextKey) : [nextKey];
+  });
 }

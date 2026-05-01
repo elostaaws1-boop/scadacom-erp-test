@@ -20,11 +20,11 @@ export default async function ReportsPage() {
   const taxDebt = taxes.reduce((sum, t) => sum + Number(t.amountDue) - Number(t.paid), 0);
   return (
     <>
-      <PageHeader title="Reports" description="Profit per project, expenses, purchases, supplier debt, taxes, fleet cost, and cash flow." action={<div className="flex gap-2"><a className="inline-flex items-center gap-2 rounded-md border border-black/10 bg-white px-4 py-2 text-sm font-semibold" href="/api/export?format=xlsx"><Download size={16} /> Excel</a><a className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" href="/api/export?format=pdf"><Download size={16} /> PDF</a></div>} />
+      <PageHeader titleKey="pages.reports.title" descriptionKey="pages.reports.description" action={<div className="flex gap-2"><a className="inline-flex items-center gap-2 rounded-md border border-black/10 bg-white px-4 py-2 text-sm font-semibold" href="/api/export?format=xlsx"><Download size={16} /> Excel</a><a className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" href="/api/export?format=pdf"><Download size={16} /> PDF</a></div>} />
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Portfolio profit" value={mad(profit)} />
-        <StatCard label="Supplier debt" value={mad(supplierDebt)} />
-        <StatCard label="Tax remaining" value={mad(taxDebt)} />
+        <StatCard labelKey="pages.reports.portfolioProfit" value={mad(profit)} />
+        <StatCard labelKey="pages.reports.supplierDebt" value={mad(supplierDebt)} />
+        <StatCard labelKey="pages.reports.taxRemaining" value={mad(taxDebt)} />
       </div>
     </>
   );

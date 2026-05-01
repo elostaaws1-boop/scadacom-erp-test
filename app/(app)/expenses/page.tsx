@@ -12,7 +12,7 @@ export default async function ExpensesPage() {
   const expenses = await prisma.expense.findMany({ where: projectIds ? { projectId: { in: projectIds } } : {}, include: { project: true, mission: true, receipts: true }, orderBy: { createdAt: "desc" } });
   return (
     <>
-      <PageHeader title="Expenses" description="Pending expenses never affect project cost. Food, hotel, and personal expenses are blocked unless explicitly overridden." />
+      <PageHeader titleKey="pages.approvals.expenseTitle" descriptionKey="pages.approvals.expenseDescription" />
       <div className="grid gap-4">
         {expenses.map((item) => {
           const receiptTotal = item.receipts.reduce((sum, receipt) => sum + Number(receipt.costMad), 0);

@@ -12,7 +12,7 @@ export default async function PurchasesPage() {
   const purchases = await prisma.purchase.findMany({ where: projectIds ? { projectId: { in: projectIds } } : {}, include: { project: true, mission: true, receipts: true }, orderBy: { createdAt: "desc" } });
   return (
     <>
-      <PageHeader title="Work Purchases" description="Fuel, péage, paper copies, duct tape, gloves, screws, connectors, tools, and emergency materials must be tracked and approved." />
+      <PageHeader titleKey="pages.approvals.purchaseTitle" descriptionKey="pages.approvals.purchaseDescription" />
       <div className="grid gap-4">
         {purchases.map((item) => {
           const receiptTotal = item.receipts.reduce((sum, receipt) => sum + Number(receipt.costMad), 0);

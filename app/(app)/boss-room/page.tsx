@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { BossRoomConsole, type UnlockState } from "@/components/boss-room-console";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
+import { T } from "@/components/translated-text";
 import { mad } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { isBossIdentity } from "@/lib/rbac";
@@ -60,9 +61,9 @@ export default async function BossRoomPage() {
   const projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
   return (
     <>
-      <PageHeader title="Boss Profit Room" description="Confidential Boss-only space. Passcode required even after login." />
+      <PageHeader titleKey="pages.bossRoom.title" descriptionKey="pages.bossRoom.description" />
       <BossRoomConsole projects={projects} unlock={unlockBossRoom} simulate={simulate} />
-      <div className="mt-6 grid gap-4 md:grid-cols-4"><StatCard label="Target margin" value="25%" /><StatCard label="Break-even" value={mad(0)} /><StatCard label="Risk threshold" value="12%" /><StatCard label="Access" value="Boss only" /></div>
+      <div className="mt-6 grid gap-4 md:grid-cols-4"><StatCard labelKey="pages.bossRoom.targetMargin" value="25%" /><StatCard labelKey="pages.bossRoom.breakEven" value={mad(0)} /><StatCard labelKey="pages.bossRoom.riskThreshold" value="12%" /><StatCard labelKey="pages.bossRoom.access" value={<T k="pages.bossRoom.bossOnly" />} /></div>
     </>
   );
 }

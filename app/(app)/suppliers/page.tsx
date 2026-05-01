@@ -8,7 +8,7 @@ export default async function SuppliersPage() {
   const today = new Date();
   return (
     <>
-      <PageHeader title="Suppliers" description="Supplier debt, unpaid invoices, due dates, and aging exposure." />
+      <PageHeader titleKey="pages.suppliers.title" descriptionKey="pages.suppliers.description" />
       <div className="grid gap-4">
         {suppliers.map((supplier) => {
           const owed = supplier.invoices.reduce((sum, invoice) => sum + Number(invoice.amount) - Number(invoice.paidAmount), 0);

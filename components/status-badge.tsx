@@ -10,6 +10,5 @@ export function StatusBadge({ status }: { status: string }) {
     COMPLETED: "bg-blue-100 text-blue-800",
     OVERDUE: "bg-red-100 text-red-700"
   };
-  const label = status === "PENDING" ? "PENDING VERIFICATION" : status.replaceAll("_", " ");
-  return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${map[status] ?? "bg-stone-100 text-stone-700"}`}><TranslatedText text={label} /></span>;
+  return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${map[status] ?? "bg-stone-100 text-stone-700"}`}><TranslatedText k={`common.status.${status}`} /></span>;
 }

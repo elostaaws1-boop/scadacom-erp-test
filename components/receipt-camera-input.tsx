@@ -2,6 +2,7 @@
 
 import { Camera, Plus, RotateCcw, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { useTranslation } from "@/components/translated-text";
 
 type CapturedReceipt = {
   preview: string;
@@ -11,6 +12,7 @@ type CapturedReceipt = {
 };
 
 export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string }) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -32,7 +34,7 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
         await videoRef.current.play();
       }
     } catch {
-      setError("Camera access is required to take a receipt photo.");
+      setError(t("common.messages.cameraRequired"));
     }
   }
 
@@ -116,7 +118,7 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
   return (
     <div className="rounded-md border border-dashed border-stone-300 bg-field p-3">
       <input ref={inputRef} name={name} type="file" accept="image/jpeg" multiple className="hidden" />
-      <p className="text-sm font-semibold text-ink">Receipt photo</p>
+      <p className="text-sm font-semibold text-ink">{t("common.units.receipt")}</p>
 
       {receipts.length > 0 ? (
         <div className="mt-3">
@@ -125,12 +127,12 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
               <div className="rounded-md border border-black/10 bg-white p-2" key={receipt.preview}>
                 <div className="relative">
                   <img src={receipt.preview} alt={`Captured receipt ${index + 1}`} className="h-32 w-full rounded-md border border-black/10 object-cover" />
-                  <button type="button" onClick={() => removePhoto(index)} className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-ink shadow" title="Remove receipt photo">
+                  <button type="button" onClick={() => removePhoto(index)} className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-ink shadow" title={t("common.messages.removeReceipt")}>
                     <X size={15} />
                   </button>
                 </div>
                 <label className="mt-2 block text-xs font-semibold text-ink">
-                  Receipt cost MAD
+                  {t("common.fields.amountMad")}
                   <input
                     name="receiptCosts"
                     type="number"
@@ -140,32 +142,32 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
                     value={receipt.cost}
                     onChange={(event) => updateReceipt(index, "cost", event.target.value)}
                     className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    placeholder={receipt.analyzing ? "Analyzing..." : "Required"}
+                    placeholder={receipt.analyzing ? t("common.messages.analyzing") : t("common.messages.required")}
                   />
                 </label>
                 <label className="mt-2 block text-xs font-semibold text-ink">
-                  Product / receipt note
+                  {t("pages.technician.itemProduct")}
                   <input
                     name="receiptNotes"
                     value={receipt.note}
                     onChange={(event) => updateReceipt(index, "note", event.target.value)}
                     className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    placeholder={receipt.analyzing ? "Reading product..." : "Optional"}
+                    placeholder={receipt.analyzing ? t("common.messages.readingProduct") : t("common.messages.optional")}
                   />
                 </label>
                 <p className="mt-2 text-xs text-stone-500">
-                  {receipt.analyzing ? "Analyzing receipt image..." : "Review detected price and product before submitting."}
+                  {receipt.analyzing ? t("common.messages.analyzingReceipt") : t("common.messages.reviewReceipt")}
                 </p>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs font-medium text-stone-600">{receipts.length} receipt photo{receipts.length === 1 ? "" : "s"} captured. Cost is mandatory for each receipt. Note is optional.</p>
+          <p className="mt-3 text-xs font-medium text-stone-600">{t(receipts.length === 1 ? "common.messages.receiptCaptured" : "common.messages.receiptsCaptured", { count: receipts.length })}</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <button type="button" onClick={startCamera} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-mint px-3 py-3 text-sm font-semibold text-white">
-              <Plus size={16} /> Add another receipt
+              <Plus size={16} /> {t("common.actions.addAnotherReceipt")}
             </button>
             <button type="button" onClick={resetPhotos} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-black/10 bg-white px-3 py-3 text-sm font-semibold">
-              <RotateCcw size={16} /> Clear all
+              <RotateCcw size={16} /> {t("common.actions.clearAll")}
             </button>
           </div>
         </div>
@@ -176,9 +178,9 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
           <video ref={videoRef} playsInline muted className="max-h-56 w-full rounded-md bg-black object-cover" />
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={capturePhoto} className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-mint px-3 py-2 text-sm font-semibold text-white">
-              <Camera size={16} /> Capture
+              <Camera size={16} /> {t("common.actions.capture")}
             </button>
-            <button type="button" onClick={stopCamera} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-black/10 bg-white" title="Cancel camera">
+            <button type="button" onClick={stopCamera} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-black/10 bg-white" title={t("common.messages.cancelCamera")}>
               <X size={16} />
             </button>
           </div>
@@ -187,7 +189,7 @@ export function ReceiptCameraInput({ name = "receiptPhoto" }: { name?: string })
 
       {!active && receipts.length === 0 ? (
         <button type="button" onClick={startCamera} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-3 py-3 text-sm font-semibold text-white">
-          <Camera size={16} /> Take photo
+          <Camera size={16} /> {t("common.actions.takePhoto")}
         </button>
       ) : null}
 

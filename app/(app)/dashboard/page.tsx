@@ -41,20 +41,20 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" description="Live control center for cash, approvals, project cost, and risk." />
+      <PageHeader titleKey="pages.dashboard.title" descriptionKey="pages.dashboard.description" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Company cash" value={mad(cash)} detail="Bank and cash box combined" />
-        <StatCard label="Open project value" value={mad(revenue)} />
-        <StatCard label="Approved cost" value={mad(cost)} detail="Pending items are excluded" />
-        <StatCard label="Pending approvals" value={pendingPurchases + pendingExpenses + pendingAdvances} detail="Purchases, expenses, advances" />
+        <StatCard labelKey="pages.dashboard.companyCash" value={mad(cash)} detailKey="pages.dashboard.bankCashCombined" />
+        <StatCard labelKey="pages.dashboard.openProjectValue" value={mad(revenue)} />
+        <StatCard labelKey="pages.dashboard.approvedCost" value={mad(cost)} detailKey="pages.dashboard.pendingExcluded" />
+        <StatCard labelKey="pages.dashboard.pendingApprovals" value={pendingPurchases + pendingExpenses + pendingAdvances} detailKey="pages.dashboard.approvalTypes" />
       </div>
       <section className="mt-6 rounded-lg border border-black/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-2 md:flex-row md:items-end">
           <div>
-          <h2 className="text-lg font-semibold"><T text="Purchase Category Analysis" /></h2>
-            <p className="mt-1 text-sm text-stone-600"><T text="Approved purchase spend by category, ranked highest first." /></p>
+          <h2 className="text-lg font-semibold"><T k="pages.dashboard.purchaseCategoryAnalysis" /></h2>
+            <p className="mt-1 text-sm text-stone-600"><T k="pages.dashboard.purchaseCategoryDescription" /></p>
           </div>
-          <p className="text-sm font-semibold text-stone-600"><T text="Total analyzed" />: {mad(categoryTotal)}</p>
+          <p className="text-sm font-semibold text-stone-600"><T k="pages.dashboard.totalAnalyzed" />: {mad(categoryTotal)}</p>
         </div>
         <div className="mt-4 grid gap-3">
           {categorySpend.length > 0 ? (
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <div>
                       <p className="font-semibold text-ink">{item.category}</p>
-                      <p className="text-xs text-stone-500">{item.count} approved purchase{item.count === 1 ? "" : "s"}</p>
+                      <p className="text-xs text-stone-500"><T k={item.count === 1 ? "pages.dashboard.approvedPurchaseCount" : "pages.dashboard.approvedPurchasesCount"} values={{ count: item.count }} /></p>
                     </div>
                     <p className="font-semibold">{mad(item.total)}</p>
                   </div>
@@ -76,13 +76,13 @@ export default async function DashboardPage() {
               );
             })
           ) : (
-            <p className="rounded-md border border-dashed border-stone-300 p-4 text-sm text-stone-500"><T text="No approved purchases yet. Categories will appear here after purchases are approved." /></p>
+            <p className="rounded-md border border-dashed border-stone-300 p-4 text-sm text-stone-500"><T k="common.empty.noApprovedPurchases" /></p>
           )}
         </div>
       </section>
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold"><T text="Recent Projects" /></h2>
+          <h2 className="text-lg font-semibold"><T k="pages.dashboard.recentProjects" /></h2>
           <div className="mt-4 grid gap-3">
             {projects.map((project) => (
               <a className="rounded-md border border-black/10 p-4 hover:bg-field" href={`/projects/${project.id}`} key={project.id}>
@@ -93,13 +93,13 @@ export default async function DashboardPage() {
                   </div>
                   <StatusBadge status={project.status} />
                 </div>
-                <p className="mt-3 text-sm text-stone-600"><T text="Budget left" />: {mad(Number(project.allocatedBudget) - Number(project.actualCost))}</p>
+                <p className="mt-3 text-sm text-stone-600"><T k="pages.dashboard.budgetLeft" />: {mad(Number(project.allocatedBudget) - Number(project.actualCost))}</p>
               </a>
             ))}
           </div>
         </section>
         <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold"><T text="Morocco Tax Watch" /></h2>
+          <h2 className="text-lg font-semibold"><T k="pages.dashboard.taxWatch" /></h2>
           <div className="mt-4 grid gap-3">
             {taxes.map((tax) => (
               <div className="rounded-md border border-black/10 p-4" key={tax.id}>
@@ -107,7 +107,7 @@ export default async function DashboardPage() {
                   <p className="font-semibold">{tax.type} · {tax.period}</p>
                   <StatusBadge status={tax.status} />
                 </div>
-                <p className="mt-2 text-sm text-stone-600"><T text="Remaining" />: {mad(Number(tax.amountDue) - Number(tax.paid))}</p>
+                <p className="mt-2 text-sm text-stone-600"><T k="pages.dashboard.remaining" />: {mad(Number(tax.amountDue) - Number(tax.paid))}</p>
               </div>
             ))}
           </div>

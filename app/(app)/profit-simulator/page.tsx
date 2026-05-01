@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { PageHeader } from "@/components/page-header";
 import { ProfitSimulatorConsole, type ProfitSimulatorState } from "@/components/profit-simulator-console";
 import { StatCard } from "@/components/stat-card";
+import { T } from "@/components/translated-text";
 import { mad } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { hasGlobalProjectAccess, projectControlRoles } from "@/lib/rbac";
@@ -68,13 +69,13 @@ export default async function ProfitSimulatorPage() {
 
   return (
     <>
-      <PageHeader title="Profit Simulator" description="Model revenue, cost, margin, break-even, and recommended pricing before saving a scenario to a project." />
+      <PageHeader titleKey="nav.profitSimulator" descriptionKey="pages.profitSimulator.description" />
       <ProfitSimulatorConsole projects={projects} run={runSimulator} />
       <div className="mt-6 grid gap-4 md:grid-cols-4">
-        <StatCard label="Target margin" value="25%" />
-        <StatCard label="Break-even" value={mad(0)} />
-        <StatCard label="Risk threshold" value="12%" />
-        <StatCard label="Access" value="Boss, GM, PM" />
+        <StatCard labelKey="pages.bossRoom.targetMargin" value="25%" />
+        <StatCard labelKey="pages.bossRoom.breakEven" value={mad(0)} />
+        <StatCard labelKey="pages.bossRoom.riskThreshold" value="12%" />
+        <StatCard labelKey="pages.bossRoom.access" value={<T k="pages.profitSimulator.accessRoles" />} />
       </div>
     </>
   );
