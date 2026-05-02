@@ -31,16 +31,20 @@ export function NotificationBell({ locale }: { locale: Locale }) {
   const seenCritical = useRef(new Set<string>());
 
   async function loadNotifications() {
-    const response = await fetch("/api/notifications", { cache: "no-store" });
-    if (!response.ok) return;
-    const data = (await response.json()) as { unreadCount: number; notifications: NotificationItem[]; preference: Preference };
-    setUnreadCount(data.unreadCount);
-    setItems(data.notifications);
-    setPreference(data.preference);
-    const newCritical = data.notifications.find((item) => !item.isRead && item.severity === "CRITICAL" && !seenCritical.current.has(item.id));
-    if (newCritical && data.preference.vibrationEnabled && "vibrate" in navigator) {
-      navigator.vibrate([200, 100, 200]);
-      seenCritical.current.add(newCritical.id);
+    try {
+      const response = await fetch("/api/notifications", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { unreadCount: number; notifications: NotificationItem[]; preference: Preference };
+      setUnreadCount(data.unreadCount);
+      setItems(data.notifications);
+      setPreference(data.preference);
+      const newCritical = data.notifications.find((item) => !item.isRead && item.severity === "CRITICAL" && !seenCritical.current.has(item.id));
+      if (newCritical && data.preference.vibrationEnabled && "vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+        seenCritical.current.add(newCritical.id);
+      }
+    } catch (error) {
+      console.error("Notification poll failed", error);
     }
   }
 

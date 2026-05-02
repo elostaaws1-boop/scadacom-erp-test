@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "i18n:check": "node scripts/check-i18n.cjs",
+    "qa:routes": "node scripts/qa-routes.cjs",
     "reports:generate-monthly": "tsx scripts/generate-monthly-report.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

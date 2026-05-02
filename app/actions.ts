@@ -693,33 +693,43 @@ export async function approveSubmission(formData: FormData) {
   const status = text(formData, "status") as ApprovalStatus;
   const approvedAmount = text(formData, "approvedAmount") ? number(formData, "approvedAmount") : null;
   const reason = text(formData, "reason");
+  if (!["purchase", "expense", "advance"].includes(entity)) throw new Error("Invalid approval type.");
+  if (!["APPROVED", "REJECTED", "PARTIALLY_APPROVED"].includes(status)) throw new Error("Invalid approval status.");
   if (status === "REJECTED" && !reason) throw new Error("Rejection reason is required.");
   if (status === "PARTIALLY_APPROVED" && approvedAmount === null) throw new Error("Partial approval requires an approved amount.");
 
   if (entity === "purchase") {
-    const before = await prisma.purchase.findUniqueOrThrow({ where: { id } });
+    const before = await prisma.purchase.findUnique({ where: { id } });
+    if (!before) throw new Error("Purchase not found.");
     if (!(await canAccessProject(user, before.projectId))) throw new Error("Not allowed for this project.");
-    if (user.role === "BOSS" && status !== "PENDING" && !reason) throw new Error("Boss override requires a logged reason.");
+    if (before.status !== "PENDING" && user.role !== "BOSS") throw new Error("This purchase was already reviewed.");
+    if (before.status !== "PENDING" && user.role === "BOSS" && !reason) throw new Error("Boss override requires a logged reason.");
     const updated = await prisma.purchase.update({ where: { id }, data: { status, approvedAmount } });
     await prisma.approval.create({ data: { actorId: user.id, purchaseId: id, status, approvedAmount, reason } });
     await recalculateProjectCost(updated.projectId);
     await audit({ actorId: user.id, action: "APPROVE", entity: "Purchase", entityId: id, before, after: updated });
     await notifyApprovalDecision({ entity: "purchase", recordId: id, requesterId: before.submittedById, status });
+    revalidatePath("/purchases");
   }
   if (entity === "expense") {
-    const before = await prisma.expense.findUniqueOrThrow({ where: { id } });
+    const before = await prisma.expense.findUnique({ where: { id } });
+    if (!before) throw new Error("Expense not found.");
     if (!(await canAccessProject(user, before.projectId))) throw new Error("Not allowed for this project.");
-    if (user.role === "BOSS" && status !== "PENDING" && !reason) throw new Error("Boss override requires a logged reason.");
+    if (before.status !== "PENDING" && user.role !== "BOSS") throw new Error("This expense was already reviewed.");
+    if (before.status !== "PENDING" && user.role === "BOSS" && !reason) throw new Error("Boss override requires a logged reason.");
     const updated = await prisma.expense.update({ where: { id }, data: { status, approvedAmount } });
     await prisma.approval.create({ data: { actorId: user.id, expenseId: id, status, approvedAmount, reason } });
     await recalculateProjectCost(updated.projectId);
     await audit({ actorId: user.id, action: "APPROVE", entity: "Expense", entityId: id, before, after: updated });
     await notifyApprovalDecision({ entity: "expense", recordId: id, requesterId: before.submittedById, status });
+    revalidatePath("/expenses");
   }
   if (entity === "advance") {
-    const before = await prisma.advanceRequest.findUniqueOrThrow({ where: { id } });
+    const before = await prisma.advanceRequest.findUnique({ where: { id } });
+    if (!before) throw new Error("Advance request not found.");
     if (!(await canAccessProject(user, before.projectId))) throw new Error("Not allowed for this project.");
-    if (user.role === "BOSS" && status !== "PENDING" && !reason) throw new Error("Boss override requires a logged reason.");
+    if (before.status !== "PENDING" && user.role !== "BOSS") throw new Error("This advance request was already reviewed.");
+    if (before.status !== "PENDING" && user.role === "BOSS" && !reason) throw new Error("Boss override requires a logged reason.");
     const updated = await prisma.advanceRequest.update({ where: { id }, data: { status } });
     await prisma.approval.create({ data: { actorId: user.id, advanceId: id, status, approvedAmount, reason } });
     await audit({ actorId: user.id, action: "APPROVE", entity: "AdvanceRequest", entityId: id, before, after: updated });
