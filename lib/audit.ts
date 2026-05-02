@@ -23,32 +23,41 @@ export async function audit(input: {
     : null;
   const oldValue = cleanJson(input.before);
   const newValue = cleanJson(input.after);
-  await prisma.auditLog.create({
-    data: {
-      actorId: input.actorId,
+  try {
+    await prisma.auditLog.create({
+      data: {
+        actorId: input.actorId,
+        action: input.action,
+        entity: input.entity,
+        entityId: input.entityId,
+        before: oldValue,
+        after: newValue,
+        ip: input.ip,
+        actionType: normalizeAction(input.action),
+        module: input.entity,
+        recordId: input.entityId,
+        recordLabel: input.recordLabel ?? inferLabel(input.after) ?? inferLabel(input.before),
+        performedByName: actor?.name,
+        performedByRole: actor?.role as Role | undefined,
+        oldValue,
+        newValue,
+        changeSummary: input.changeSummary ?? buildChangeSummary(oldValue, newValue),
+        reason: input.reason,
+        userAgent: input.userAgent,
+        severity: input.severity ?? inferSeverity(input.action, input.entity),
+        projectId: input.projectId ?? inferProjectId(input.after) ?? inferProjectId(input.before),
+        financialAction: input.financialAction ?? isFinancialEntity(input.entity),
+        deletedRecord: input.deletedRecord ?? /delete|void|archive/i.test(input.action)
+      }
+    });
+  } catch (error) {
+    console.error("Audit log failed", {
       action: input.action,
       entity: input.entity,
       entityId: input.entityId,
-      before: oldValue,
-      after: newValue,
-      ip: input.ip,
-      actionType: normalizeAction(input.action),
-      module: input.entity,
-      recordId: input.entityId,
-      recordLabel: input.recordLabel ?? inferLabel(input.after) ?? inferLabel(input.before),
-      performedByName: actor?.name,
-      performedByRole: actor?.role as Role | undefined,
-      oldValue,
-      newValue,
-      changeSummary: input.changeSummary ?? buildChangeSummary(oldValue, newValue),
-      reason: input.reason,
-      userAgent: input.userAgent,
-      severity: input.severity ?? inferSeverity(input.action, input.entity),
-      projectId: input.projectId ?? inferProjectId(input.after) ?? inferProjectId(input.before),
-      financialAction: input.financialAction ?? isFinancialEntity(input.entity),
-      deletedRecord: input.deletedRecord ?? /delete|void|archive/i.test(input.action)
-    }
-  });
+      error
+    });
+  }
 }
 
 export function normalizeAction(action: string) {

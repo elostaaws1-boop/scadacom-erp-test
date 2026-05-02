@@ -20,39 +20,49 @@ type NotificationInput = {
 const HIGH_AMOUNT = Number(process.env.BOSS_NOTIFICATION_AMOUNT_THRESHOLD ?? 10000);
 
 export async function createNotification(input: NotificationInput) {
-  const existing = input.relatedRecordId
-    ? await prisma.notification.findFirst({
-        where: {
-          recipientUserId: input.recipientUserId,
-          type: input.type,
-          relatedRecordId: input.relatedRecordId,
-          isRead: false
-        }
-      })
-    : null;
-  if (existing) return existing;
+  try {
+    const existing = input.relatedRecordId
+      ? await prisma.notification.findFirst({
+          where: {
+            recipientUserId: input.recipientUserId,
+            type: input.type,
+            relatedRecordId: input.relatedRecordId,
+            isRead: false
+          }
+        })
+      : null;
+    if (existing) return existing;
 
-  const notification = await prisma.notification.create({
-    data: {
-      recipientUserId: input.recipientUserId,
-      title: input.title,
-      message: input.message,
+    const notification = await prisma.notification.create({
+      data: {
+        recipientUserId: input.recipientUserId,
+        title: input.title,
+        message: input.message,
+        type: input.type,
+        severity: input.severity,
+        relatedModule: input.relatedModule,
+        relatedRecordId: input.relatedRecordId,
+        metadata: { ...(input.metadata ?? {}), url: input.url }
+      }
+    });
+
+    await sendPushToUser({
+      userId: input.recipientUserId,
+      title: pushTitle(input.type),
+      body: pushBody(input.type),
+      url: input.url,
+      severity: input.severity
+    });
+    return notification;
+  } catch (error) {
+    console.error("Notification failed", {
       type: input.type,
-      severity: input.severity,
-      relatedModule: input.relatedModule,
+      recipientUserId: input.recipientUserId,
       relatedRecordId: input.relatedRecordId,
-      metadata: { ...(input.metadata ?? {}), url: input.url }
-    }
-  });
-
-  await sendPushToUser({
-    userId: input.recipientUserId,
-    title: pushTitle(input.type),
-    body: pushBody(input.type),
-    url: input.url,
-    severity: input.severity
-  });
-  return notification;
+      error
+    });
+    return null;
+  }
 }
 
 export async function notifySubmitted(input: {
@@ -212,29 +222,42 @@ export async function ensureSystemNotificationsForUser(user: AppUser) {
 }
 
 export async function getNotificationBadgeCounts(user: AppUser) {
-  const projectIds = await projectIdsForUser(user);
-  const projectWhere = projectIds ? { projectId: { in: projectIds } } : {};
-  const now = new Date();
-  const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const [
-    advances,
-    purchases,
-    expenses,
-    suppliers,
-    taxes,
-    fleet,
-    warehouseItems,
-    criticalProjects
-  ] = await Promise.all([
-    canSee(user.role, "advances") ? prisma.advanceRequest.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
-    canSee(user.role, "purchases") ? prisma.purchase.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
-    canSee(user.role, "expenses") ? prisma.expense.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
-    canSee(user.role, "suppliers") ? overdueSupplierCount() : 0,
-    canSee(user.role, "taxes") ? prisma.taxObligation.count({ where: { dueDate: { lte: now } } }) : 0,
-    canSee(user.role, "fleet") ? prisma.vehicle.count({ where: { OR: [{ oilChangeDue: { lte: soon } }, { insuranceDue: { lte: soon } }, { inspectionDue: { lte: soon } }] } }) : 0,
-    canSee(user.role, "warehouse") ? lowStockCount() : 0,
-    isBossIdentity(user.role, user.email) ? criticalProjectCount() : 0
-  ]);
+  let advances = 0;
+  let purchases = 0;
+  let expenses = 0;
+  let suppliers = 0;
+  let taxes = 0;
+  let fleet = 0;
+  let warehouseItems = 0;
+  let criticalProjects = 0;
+
+  try {
+    const projectIds = await projectIdsForUser(user);
+    const projectWhere = projectIds ? { projectId: { in: projectIds } } : {};
+    const now = new Date();
+    const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    [
+      advances,
+      purchases,
+      expenses,
+      suppliers,
+      taxes,
+      fleet,
+      warehouseItems,
+      criticalProjects
+    ] = await Promise.all([
+      canSee(user.role, "advances") ? prisma.advanceRequest.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
+      canSee(user.role, "purchases") ? prisma.purchase.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
+      canSee(user.role, "expenses") ? prisma.expense.count({ where: { status: "PENDING", ...projectWhere } }) : 0,
+      canSee(user.role, "suppliers") ? overdueSupplierCount() : 0,
+      canSee(user.role, "taxes") ? prisma.taxObligation.count({ where: { dueDate: { lte: now } } }) : 0,
+      canSee(user.role, "fleet") ? prisma.vehicle.count({ where: { OR: [{ oilChangeDue: { lte: soon } }, { insuranceDue: { lte: soon } }, { inspectionDue: { lte: soon } }] } }) : 0,
+      canSee(user.role, "warehouse") ? lowStockCount() : 0,
+      isBossIdentity(user.role, user.email) ? criticalProjectCount() : 0
+    ]);
+  } catch (error) {
+    console.error("Notification badge counts failed", error);
+  }
 
   return {
     "/advances": { count: advances, severity: "warning" as const },

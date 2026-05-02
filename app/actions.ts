@@ -724,6 +724,7 @@ export async function approveSubmission(formData: FormData) {
     await prisma.approval.create({ data: { actorId: user.id, advanceId: id, status, approvedAmount, reason } });
     await audit({ actorId: user.id, action: "APPROVE", entity: "AdvanceRequest", entityId: id, before, after: updated });
     await notifyApprovalDecision({ entity: "advance", recordId: id, requesterId: before.requestedById, status });
+    revalidatePath("/advances");
   }
   revalidatePath("/");
 }
