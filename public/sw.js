@@ -29,3 +29,32 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/login")))
   );
 });
+
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || "ScadaCom ERP";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "Open ScadaCom ERP to review.",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url || "/" },
+      vibrate: data.vibrate
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((client) => client.url.includes(self.location.origin));
+      if (existing) {
+        existing.focus();
+        return existing.navigate(url);
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

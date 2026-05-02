@@ -111,22 +111,31 @@ enum MonthlyReportStatus {
   ARCHIVED
 }
 
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model User {
-  id                 String              @id @default(cuid())
-  name               String
-  email              String              @unique
-  passwordHash       String
-  role               Role
-  active             Boolean             @default(true)
-  employee           Employee?
-  invitesCreated     Invite[]            @relation("InviteCreator")
-  auditLogs          AuditLog[]
-  approvals          Approval[]
-  locations          LocationUpdate[]
-  projectAssignments ProjectAssignment[]
-  bossRoomLogs       BossRoomAccessLog[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                     String                  @id @default(cuid())
+  name                   String
+  email                  String                  @unique
+  passwordHash           String
+  role                   Role
+  active                 Boolean                 @default(true)
+  employee               Employee?
+  invitesCreated         Invite[]                @relation("InviteCreator")
+  auditLogs              AuditLog[]
+  notifications          Notification[]
+  pushSubscriptions      PushSubscription[]
+  notificationPreference NotificationPreference?
+  approvals              Approval[]
+  locations              LocationUpdate[]
+  projectAssignments     ProjectAssignment[]
+  bossRoomLogs           BossRoomAccessLog[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 }
 
 model Invite {
@@ -517,20 +526,20 @@ model ProfitScenario {
 }
 
 model MonthlyPerformanceReport {
-  id          String              @id @default(cuid())
-  month       Int
-  year        Int
-  periodStart DateTime
-  periodEnd   DateTime
-  status      MonthlyReportStatus @default(DRAFT)
+  id            String              @id @default(cuid())
+  month         Int
+  year          Int
+  periodStart   DateTime
+  periodEnd     DateTime
+  status        MonthlyReportStatus @default(DRAFT)
   generatedById String?
-  generatedAt DateTime?
-  lockedById  String?
-  lockedAt    DateTime?
-  archivedAt  DateTime?
-  snapshot    Json
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  generatedAt   DateTime?
+  lockedById    String?
+  lockedAt      DateTime?
+  archivedAt    DateTime?
+  snapshot      Json
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@unique([month, year])
 }
@@ -564,4 +573,47 @@ model BossRoomAccessLog {
   success   Boolean
   ip        String?
   createdAt DateTime @default(now())
+}
+
+model Notification {
+  id              String               @id @default(cuid())
+  recipientUserId String
+  recipient       User                 @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  title           String
+  message         String
+  type            String
+  severity        NotificationSeverity @default(INFO)
+  relatedModule   String
+  relatedRecordId String?
+  isRead          Boolean              @default(false)
+  readAt          DateTime?
+  metadata        Json?
+  createdAt       DateTime             @default(now())
+
+  @@index([recipientUserId, isRead, createdAt])
+  @@index([type, relatedRecordId])
+}
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
+  keys       Json
+  deviceName String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
+}
+
+model NotificationPreference {
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushEnabled        Boolean  @default(false)
+  vibrationEnabled   Boolean  @default(true)
+  criticalOnly       Boolean  @default(false)
+  emailEnabledFuture Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
 }

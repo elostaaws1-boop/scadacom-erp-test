@@ -13,6 +13,7 @@ import { audit } from "@/lib/audit";
 import { canAccessProject } from "@/lib/access";
 import { allowanceRateToMad, canSpendProject, isForbiddenFieldExpense, missionDays, recalculateProjectCost } from "@/lib/business";
 import { createInviteToken, hashToken } from "@/lib/invite";
+import { notifyApprovalDecision, notifySubmitted } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { canApprove, canOverride } from "@/lib/rbac";
 
@@ -267,6 +268,7 @@ export async function submitPurchase(formData: FormData) {
     }
   });
   await audit({ actorId: user.id, action: "SUBMIT", entity: "Purchase", entityId: purchase.id, after: purchase });
+  await notifySubmitted({ entity: "purchase", recordId: purchase.id, projectId, submittedById: user.id, amount: Number(purchase.amount), hasReceipt: Boolean(purchase.receiptPath || receipts.length > 0) });
   revalidatePath("/purchases");
   revalidatePath("/technician");
 }
@@ -296,6 +298,7 @@ export async function submitExpense(formData: FormData) {
     }
   });
   await audit({ actorId: user.id, action: "SUBMIT", entity: "Expense", entityId: expense.id, after: expense });
+  await notifySubmitted({ entity: "expense", recordId: expense.id, projectId, submittedById: user.id, amount: Number(expense.amount), hasReceipt: Boolean(expense.receiptPath || receipts.length > 0) });
   revalidatePath("/expenses");
   revalidatePath("/technician");
 }
@@ -320,6 +323,7 @@ export async function requestAdvance(formData: FormData) {
     }
   });
   await audit({ actorId: user.id, action: check.needsOverride ? "REQUEST_WITH_OVERRIDE" : "REQUEST", entity: "AdvanceRequest", entityId: advance.id, after: advance });
+  await notifySubmitted({ entity: "advance", recordId: advance.id, projectId, submittedById: user.id, amount: Number(advance.amount) });
   revalidatePath("/advances");
   revalidatePath("/technician");
 }
@@ -700,6 +704,7 @@ export async function approveSubmission(formData: FormData) {
     await prisma.approval.create({ data: { actorId: user.id, purchaseId: id, status, approvedAmount, reason } });
     await recalculateProjectCost(updated.projectId);
     await audit({ actorId: user.id, action: "APPROVE", entity: "Purchase", entityId: id, before, after: updated });
+    await notifyApprovalDecision({ entity: "purchase", recordId: id, requesterId: before.submittedById, status });
   }
   if (entity === "expense") {
     const before = await prisma.expense.findUniqueOrThrow({ where: { id } });
@@ -709,6 +714,7 @@ export async function approveSubmission(formData: FormData) {
     await prisma.approval.create({ data: { actorId: user.id, expenseId: id, status, approvedAmount, reason } });
     await recalculateProjectCost(updated.projectId);
     await audit({ actorId: user.id, action: "APPROVE", entity: "Expense", entityId: id, before, after: updated });
+    await notifyApprovalDecision({ entity: "expense", recordId: id, requesterId: before.submittedById, status });
   }
   if (entity === "advance") {
     const before = await prisma.advanceRequest.findUniqueOrThrow({ where: { id } });
@@ -717,6 +723,7 @@ export async function approveSubmission(formData: FormData) {
     const updated = await prisma.advanceRequest.update({ where: { id }, data: { status } });
     await prisma.approval.create({ data: { actorId: user.id, advanceId: id, status, approvedAmount, reason } });
     await audit({ actorId: user.id, action: "APPROVE", entity: "AdvanceRequest", entityId: id, before, after: updated });
+    await notifyApprovalDecision({ entity: "advance", recordId: id, requesterId: before.requestedById, status });
   }
   revalidatePath("/");
 }
