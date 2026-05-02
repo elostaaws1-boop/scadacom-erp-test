@@ -117,6 +117,12 @@ enum NotificationSeverity {
   CRITICAL
 }
 
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model User {
   id                     String                  @id @default(cuid())
   name                   String
@@ -545,16 +551,36 @@ model MonthlyPerformanceReport {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?
-  actor     User?    @relation(fields: [actorId], references: [id])
-  action    String
-  entity    String
-  entityId  String?
-  before    Json?
-  after     Json?
-  ip        String?
-  createdAt DateTime @default(now())
+  id              String        @id @default(cuid())
+  actorId         String?
+  actor           User?         @relation(fields: [actorId], references: [id])
+  action          String
+  entity          String
+  entityId        String?
+  before          Json?
+  after           Json?
+  ip              String?
+  createdAt       DateTime      @default(now())
+  actionType      String?
+  module          String?
+  recordId        String?
+  recordLabel     String?
+  performedByName String?
+  performedByRole Role?
+  oldValue        Json?
+  newValue        Json?
+  changeSummary   String?
+  reason          String?
+  userAgent       String?
+  severity        AuditSeverity @default(INFO)
+  projectId       String?
+  financialAction Boolean       @default(false)
+  deletedRecord   Boolean       @default(false)
+
+  @@index([createdAt])
+  @@index([module, actionType])
+  @@index([actorId, createdAt])
+  @@index([projectId])
 }
 
 model BossRoomCredential {

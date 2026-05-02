@@ -90,6 +90,7 @@ export default async function BossRoomPage() {
     prisma.project.findMany({ orderBy: { name: "asc" } }),
     prisma.monthlyPerformanceReport.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], take: 12 })
   ]);
+  const auditLogs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 12, include: { actor: true } });
   return (
     <>
       <PageHeader titleKey="pages.bossRoom.title" descriptionKey="pages.bossRoom.description" />
@@ -110,6 +111,27 @@ export default async function BossRoomPage() {
         lockReport={lockReport}
       />
       <div className="mt-6 grid gap-4 md:grid-cols-4"><StatCard labelKey="pages.bossRoom.targetMargin" value="25%" /><StatCard labelKey="pages.bossRoom.breakEven" value={mad(0)} /><StatCard labelKey="pages.bossRoom.riskThreshold" value="12%" /><StatCard labelKey="pages.bossRoom.access" value={<T k="pages.bossRoom.bossOnly" />} /></div>
+      <section className="mt-6 rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mint"><T k="pages.auditHistory.bossEyebrow" /></p>
+            <h2 className="mt-2 text-2xl font-semibold text-ink"><T k="pages.auditHistory.bossTitle" /></h2>
+          </div>
+          <a className="rounded-md border border-black/10 px-3 py-2 text-sm font-semibold" href="/audit-history"><T k="pages.auditHistory.openFull" /></a>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {auditLogs.map((log) => (
+            <div className="rounded-md border border-black/10 p-3" key={log.id}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">{log.module ?? log.entity} / {log.actionType ?? log.action}</p>
+                <p className="text-xs text-stone-500">{log.createdAt.toLocaleString()}</p>
+              </div>
+              <p className="mt-1 text-sm text-stone-600">{log.changeSummary ?? log.recordLabel ?? log.entityId ?? "-"}</p>
+              <p className="mt-1 text-xs text-stone-500">{log.performedByName ?? log.actor?.name ?? "-"}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </>
   );
 }
