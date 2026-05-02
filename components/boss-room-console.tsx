@@ -3,6 +3,7 @@
 import { useActionState, useState, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { translate, type Locale } from "@/lib/i18n";
+import type { BossIntelligenceLayer, IntelligenceSeverity } from "@/lib/boss-ai";
 import type { MonthlyReportSnapshot } from "@/lib/monthly-report";
 import { useClientLocale } from "@/components/translated-text";
 
@@ -18,6 +19,7 @@ export type UnlockState = {
 
 type BossRoomConsoleProps = {
   projects: ProjectOption[];
+  intelligence: BossIntelligenceLayer;
   reports: MonthlyReportOption[];
   unlock: (state: UnlockState, formData: FormData) => Promise<UnlockState>;
   simulate: (formData: FormData) => Promise<void>;
@@ -41,7 +43,7 @@ type ChatMessage = {
   meta?: string;
 };
 
-export function BossRoomConsole({ projects, reports, unlock, simulate, generateReport, lockReport }: BossRoomConsoleProps) {
+export function BossRoomConsole({ projects, intelligence, reports, unlock, simulate, generateReport, lockReport }: BossRoomConsoleProps) {
   const [passcode, setPasscode] = useState("");
   const [state, unlockAction] = useActionState(unlock, { ok: false });
   const locale = useClientLocale();
@@ -93,9 +95,190 @@ export function BossRoomConsole({ projects, reports, unlock, simulate, generateR
         <input name="manualCost" type="number" step="0.01" min="0" placeholder={translate(locale, "pages.bossRoom.manualCostMad")} required className="rounded-md border border-stone-300 px-3 py-3" />
         <ScenarioButton />
       </form>
+      <IntelligenceLayerPanel intelligence={intelligence} projects={projects} />
       <AiAssistantPanel passcode={passcode} />
       <MonthlyReportsPanel reports={reports} generateReport={generateReport} lockReport={lockReport} />
     </section>
+  );
+}
+
+function IntelligenceLayerPanel({ intelligence, projects }: { intelligence: BossIntelligenceLayer; projects: ProjectOption[] }) {
+  const locale = useClientLocale();
+  const [projectFilter, setProjectFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("all");
+  const selectedProject = projects.find((project) => project.id === projectFilter)?.name ?? "";
+
+  const redFlags = intelligence.redFlags.filter((item) => matchesProject(item.relatedLabel, selectedProject) && matchesDepartment(item.module, departmentFilter));
+  const rootCauses = intelligence.rootCauses.filter((item) => {
+    const linkedProjects = item.linkedTo.projects ?? [];
+    return matchesProject(linkedProjects.join(" "), selectedProject);
+  });
+  const predictions = intelligence.predictions.filter((item) => matchesTime(item.timeEstimate, timeFilter));
+  const suggestions = intelligence.suggestions.filter((item) => matchesProject(item.relatedLabel, selectedProject) && matchesDepartment(item.module, departmentFilter));
+
+  return (
+    <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">{translate(locale, "pages.bossIntelligence.eyebrow")}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">{translate(locale, "pages.bossIntelligence.title")}</h2>
+          <p className="mt-1 text-sm text-stone-600">{translate(locale, "pages.bossIntelligence.description")}</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <select className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+            <option value="">{translate(locale, "pages.bossIntelligence.filters.allProjects")}</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+          <select className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
+            <option value="all">{translate(locale, "pages.bossIntelligence.filters.allDepartments")}</option>
+            <option value="finance">{translate(locale, "pages.bossIntelligence.modules.finance")}</option>
+            <option value="projects">{translate(locale, "pages.bossIntelligence.modules.projects")}</option>
+            <option value="operations">{translate(locale, "pages.bossIntelligence.modules.operations")}</option>
+            <option value="fleet">{translate(locale, "pages.bossIntelligence.modules.fleet")}</option>
+            <option value="warehouse">{translate(locale, "pages.bossIntelligence.modules.warehouse")}</option>
+            <option value="suppliers">{translate(locale, "pages.bossIntelligence.modules.suppliers")}</option>
+            <option value="taxes">{translate(locale, "pages.bossIntelligence.modules.taxes")}</option>
+          </select>
+          <select className="rounded-md border border-stone-300 px-3 py-2 text-sm" value={timeFilter} onChange={(event) => setTimeFilter(event.target.value)}>
+            <option value="all">{translate(locale, "pages.bossIntelligence.filters.allTime")}</option>
+            <option value="now">{translate(locale, "pages.bossIntelligence.filters.thisMonth")}</option>
+            <option value="next30">{translate(locale, "pages.bossIntelligence.filters.next30")}</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.cash")} value={money(intelligence.companyOverview.cash)} />
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.projects")} value={intelligence.companyOverview.openProjects} />
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.expenses")} value={money(intelligence.companyOverview.monthlyExpenses)} />
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.fleet")} value={intelligence.companyOverview.fleetAlerts} />
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.warehouse")} value={intelligence.companyOverview.warehouseLowStock} />
+        <OverviewMetric label={translate(locale, "pages.bossIntelligence.overview.pending")} value={intelligence.companyOverview.pendingApprovals} />
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        <LevelPanel level="1" title={translate(locale, "pages.bossIntelligence.levels.overview")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.overview")}>
+          <p className="text-sm text-stone-600">{translate(locale, "pages.bossIntelligence.period", { period: intelligence.periodLabel })}</p>
+          <ul className="mt-3 space-y-2 text-sm text-stone-700">
+            {intelligence.companyOverview.dataNotes.map((note) => <li key={note}>{note}</li>)}
+          </ul>
+        </LevelPanel>
+
+        <LevelPanel level="2" title={translate(locale, "pages.bossIntelligence.levels.redFlags")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.redFlags")}>
+          <InsightList items={redFlags.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            severity: item.severity,
+            meta: moduleLabel(locale, item.module),
+            reasoning: item.reasoning
+          }))} />
+        </LevelPanel>
+
+        <LevelPanel level="3" title={translate(locale, "pages.bossIntelligence.levels.rootCause")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.rootCause")}>
+          <InsightList items={rootCauses.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: linkedLabels(item.linkedTo) || translate(locale, "pages.bossIntelligence.noLinkedRecords"),
+            severity: item.severity,
+            meta: translate(locale, "pages.bossIntelligence.reasoning"),
+            reasoning: item.reasoning
+          }))} />
+        </LevelPanel>
+
+        <LevelPanel level="4" title={translate(locale, "pages.bossIntelligence.levels.predictions")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.predictions")}>
+          <InsightList items={predictions.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: `${item.description} ${translate(locale, "pages.bossIntelligence.confidence")}: ${confidenceLabel(locale, item.confidence)}. ${translate(locale, "pages.bossIntelligence.timeEstimate")}: ${item.timeEstimate}.`,
+            severity: item.severity,
+            meta: translate(locale, "pages.bossIntelligence.prediction"),
+            reasoning: item.reasoning
+          }))} />
+        </LevelPanel>
+
+        <LevelPanel level="5" title={translate(locale, "pages.bossIntelligence.levels.suggestions")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.suggestions")}>
+          <InsightList items={suggestions.map((item) => ({
+            id: item.id,
+            title: item.action,
+            description: `${translate(locale, "pages.bossIntelligence.reason")}: ${item.reason}`,
+            severity: item.severity,
+            meta: `${translate(locale, "pages.bossIntelligence.expectedImpact")}: ${item.expectedImpact}`,
+            reasoning: item.expectedImpact
+          }))} />
+        </LevelPanel>
+
+        <LevelPanel level="6" title={translate(locale, "pages.bossIntelligence.levels.roleAssistance")} description={translate(locale, "pages.bossIntelligence.levelDescriptions.roleAssistance")}>
+          <div className="rounded-md bg-field p-3 text-sm text-stone-700">
+            <p className="font-semibold text-ink">{translate(locale, "pages.bossIntelligence.bossControlled")}</p>
+            <p className="mt-1">{intelligence.roleAssistance.note}</p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {intelligence.roleAssistance.suggestedPrompts.map((prompt) => (
+              <span className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-stone-600" key={prompt}>{prompt}</span>
+            ))}
+          </div>
+        </LevelPanel>
+      </div>
+
+      <div className="mt-5 rounded-md bg-field p-3 text-xs text-stone-600">
+        <span className="font-semibold text-ink">{translate(locale, "pages.bossIntelligence.dataBasis")}:</span> {intelligence.dataBasis.join(", ")}
+      </div>
+    </section>
+  );
+}
+
+function OverviewMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-black/10 bg-field p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{label}</p>
+      <p className="mt-2 text-xl font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function LevelPanel({ level, title, description, children }: { level: string; title: string; description: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-black/10 p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold text-white">{level}</span>
+        <div>
+          <h3 className="text-lg font-semibold text-ink">{title}</h3>
+          <p className="mt-1 text-sm text-stone-600">{description}</p>
+        </div>
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function InsightList({
+  items
+}: {
+  items: Array<{ id: string; title: string; description: string; severity: IntelligenceSeverity; meta: string; reasoning: string }>;
+}) {
+  const locale = useClientLocale();
+  if (!items.length) {
+    return <p className="rounded-md border border-dashed border-stone-300 p-3 text-sm text-stone-500">{translate(locale, "pages.bossIntelligence.noFilteredResults")}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <article className="rounded-md border border-black/10 p-3" key={item.id}>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h4 className="font-semibold text-ink">{item.title}</h4>
+            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${severityClass(item.severity)}`}>{severityLabel(locale, item.severity)}</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-stone-700">{item.description}</p>
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{item.meta}</p>
+          <p className="mt-1 text-xs leading-5 text-stone-500">{item.reasoning}</p>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -406,6 +589,53 @@ function BarList({ title, rows }: { title: string; rows: Array<{ label: string; 
       </div>
     </section>
   );
+}
+
+function matchesProject(value: string | undefined, selectedProject: string) {
+  if (!selectedProject) return true;
+  return Boolean(value?.toLowerCase().includes(selectedProject.toLowerCase()));
+}
+
+function matchesDepartment(module: string, department: string) {
+  return department === "all" || module === department;
+}
+
+function matchesTime(timeEstimate: string, timeFilter: string) {
+  if (timeFilter === "all") return true;
+  if (timeFilter === "now") return timeEstimate.toLowerCase().includes("this");
+  return timeEstimate.toLowerCase().includes("30") || timeEstimate.toLowerCase().includes("week");
+}
+
+function linkedLabels(linkedTo: { projects?: string[]; teams?: string[]; suppliers?: string[]; vehicles?: string[] }) {
+  return [linkedTo.projects, linkedTo.teams, linkedTo.suppliers, linkedTo.vehicles].flatMap((values) => values ?? []).join(", ");
+}
+
+function severityClass(severity: IntelligenceSeverity) {
+  if (severity === "critical") return "bg-red-50 text-red-700";
+  if (severity === "warning") return "bg-amber-50 text-amber-700";
+  return "bg-emerald-50 text-emerald-700";
+}
+
+function severityLabel(locale: Locale, severity: IntelligenceSeverity) {
+  if (severity === "critical") return translate(locale, "pages.bossIntelligence.severity.critical");
+  if (severity === "warning") return translate(locale, "pages.bossIntelligence.severity.warning");
+  return translate(locale, "pages.bossIntelligence.severity.info");
+}
+
+function confidenceLabel(locale: Locale, confidence: "high" | "medium" | "low") {
+  if (confidence === "high") return translate(locale, "pages.bossIntelligence.confidenceLevels.high");
+  if (confidence === "medium") return translate(locale, "pages.bossIntelligence.confidenceLevels.medium");
+  return translate(locale, "pages.bossIntelligence.confidenceLevels.low");
+}
+
+function moduleLabel(locale: Locale, module: string) {
+  if (module === "finance") return translate(locale, "pages.bossIntelligence.modules.finance");
+  if (module === "projects") return translate(locale, "pages.bossIntelligence.modules.projects");
+  if (module === "operations") return translate(locale, "pages.bossIntelligence.modules.operations");
+  if (module === "fleet") return translate(locale, "pages.bossIntelligence.modules.fleet");
+  if (module === "warehouse") return translate(locale, "pages.bossIntelligence.modules.warehouse");
+  if (module === "suppliers") return translate(locale, "pages.bossIntelligence.modules.suppliers");
+  return translate(locale, "pages.bossIntelligence.modules.taxes");
 }
 
 function money(value: number) {

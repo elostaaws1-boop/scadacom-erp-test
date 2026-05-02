@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { T } from "@/components/translated-text";
 import { audit } from "@/lib/audit";
+import { buildBossIntelligenceLayer } from "@/lib/boss-ai";
 import { generateMonthlyPerformanceReport } from "@/lib/monthly-report";
 import { mad } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
@@ -86,9 +87,10 @@ async function lockReport(formData: FormData) {
 export default async function BossRoomPage() {
   const session = await auth();
   if (!session?.user || !isBossIdentity(session.user.role, session.user.email)) notFound();
-  const [projects, reports] = await Promise.all([
+  const [projects, reports, intelligence] = await Promise.all([
     prisma.project.findMany({ orderBy: { name: "asc" } }),
-    prisma.monthlyPerformanceReport.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], take: 12 })
+    prisma.monthlyPerformanceReport.findMany({ orderBy: [{ year: "desc" }, { month: "desc" }], take: 12 }),
+    buildBossIntelligenceLayer()
   ]);
   const auditLogs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 12, include: { actor: true } });
   return (
@@ -96,6 +98,7 @@ export default async function BossRoomPage() {
       <PageHeader titleKey="pages.bossRoom.title" descriptionKey="pages.bossRoom.description" />
       <BossRoomConsole
         projects={projects}
+        intelligence={intelligence}
         reports={reports.map((report) => ({
           id: report.id,
           month: report.month,

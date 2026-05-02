@@ -38,6 +38,79 @@ export type BossAiResponse = {
   sourceCounts: Record<string, number>;
 };
 
+export type IntelligenceSeverity = "critical" | "warning" | "info";
+export type IntelligenceImpact = "high" | "medium" | "low";
+export type IntelligenceConfidence = "high" | "medium" | "low";
+
+export type IntelligenceItem = {
+  id: string;
+  title: string;
+  description: string;
+  severity: IntelligenceSeverity;
+  module: "finance" | "projects" | "operations" | "fleet" | "warehouse" | "suppliers" | "taxes";
+  relatedLabel?: string;
+  reasoning: string;
+};
+
+export type RootCauseItem = {
+  id: string;
+  title: string;
+  severity: IntelligenceSeverity;
+  reasoning: string;
+  linkedTo: {
+    projects?: string[];
+    teams?: string[];
+    suppliers?: string[];
+    vehicles?: string[];
+  };
+};
+
+export type PredictionItem = {
+  id: string;
+  title: string;
+  description: string;
+  severity: IntelligenceSeverity;
+  confidence: IntelligenceConfidence;
+  timeEstimate: string;
+  reasoning: string;
+};
+
+export type SuggestionItem = {
+  id: string;
+  action: string;
+  reason: string;
+  expectedImpact: string;
+  severity: IntelligenceSeverity;
+  priority: number;
+  module: IntelligenceItem["module"];
+  relatedLabel?: string;
+};
+
+export type BossIntelligenceLayer = {
+  generatedAt: string;
+  periodLabel: string;
+  companyOverview: {
+    cash: number;
+    openProjects: number;
+    monthlyExpenses: number;
+    fleetAlerts: number;
+    warehouseLowStock: number;
+    pendingApprovals: number;
+    dataNotes: string[];
+  };
+  redFlags: IntelligenceItem[];
+  rootCauses: RootCauseItem[];
+  predictions: PredictionItem[];
+  suggestions: SuggestionItem[];
+  roleAssistance: {
+    mode: "suggest_draft_flag_only";
+    controlledBy: "Boss";
+    note: string;
+    suggestedPrompts: string[];
+  };
+  dataBasis: string[];
+};
+
 export async function buildBossAiContext(date = new Date()): Promise<BossAiContext> {
   const month = date.getUTCMonth() + 1;
   const year = date.getUTCFullYear();
@@ -176,6 +249,383 @@ export async function buildBossAiContext(date = new Date()): Promise<BossAiConte
   };
 }
 
+export async function buildBossIntelligenceLayer(date = new Date()): Promise<BossIntelligenceLayer> {
+  const context = await buildBossAiContext(date);
+  return buildBossIntelligenceFromContext(context);
+}
+
+export function buildBossIntelligenceFromContext(context: BossAiContext): BossIntelligenceLayer {
+  const now = new Date();
+  const cash = round(context.cashAccounts.reduce((total, account) => total + account.balance, 0));
+  const monthlyExpenses = round(context.currentMonth.financial.totalExpenses);
+  const openProjects = context.projectRisks.filter((project) => !["COMPLETED", "CANCELLED", "ARCHIVED"].includes(project.status)).length;
+  const pendingApprovals = context.pendingApprovals.advances + context.pendingApprovals.expenses + context.pendingApprovals.purchases;
+  const redFlags: IntelligenceItem[] = [];
+  const rootCauses: RootCauseItem[] = [];
+  const predictions: PredictionItem[] = [];
+  const suggestions: SuggestionItem[] = [];
+
+  const lossProjects = context.projectRisks.filter((project) => project.profit < 0);
+  const lowMarginProjects = context.projectRisks.filter((project) => project.profit >= 0 && project.margin > 0 && project.margin < 12);
+  const delayedMissions = context.openMissions.filter((mission) => mission.endDate && new Date(mission.endDate) < now);
+  const overdueSupplierDebt = context.supplierDebt.filter((invoice) => invoice.overdue);
+  const overdueTaxes = context.taxes.filter((tax) => tax.overdue);
+  const overdueFleetAlerts = context.fleetAlerts.filter((alert) => new Date(alert.dueDate) < now);
+  const missingReceipts = context.currentMonth.expenseAnalysis.expensesWithoutReceipts;
+
+  for (const project of lossProjects.slice(0, 5)) {
+    redFlags.push({
+      id: `loss-project-${slug(project.name)}`,
+      title: "Budget exceeded",
+      description: `${project.name} is showing ${money(project.profit)} profit/loss against ${money(project.contractValue)} contract value.`,
+      severity: "critical",
+      module: "projects",
+      relatedLabel: project.name,
+      reasoning: "Actual cost is higher than the contract value in the project profitability data."
+    });
+  }
+
+  for (const project of lowMarginProjects.slice(0, 5)) {
+    redFlags.push({
+      id: `low-margin-${slug(project.name)}`,
+      title: "Low project margin",
+      description: `${project.name} margin is ${project.margin}%, below the 12% risk threshold.`,
+      severity: "warning",
+      module: "projects",
+      relatedLabel: project.name,
+      reasoning: "The project has profit, but the margin is too thin to absorb additional cost or delay."
+    });
+  }
+
+  if (missingReceipts > 0) {
+    redFlags.push({
+      id: "missing-receipts",
+      title: "Missing receipts",
+      description: `${missingReceipts} approved or submitted expenses are missing receipts this month.`,
+      severity: missingReceipts > 5 ? "critical" : "warning",
+      module: "finance",
+      reasoning: "Receipt gaps weaken audit evidence and can block clean month-end reporting."
+    });
+  }
+
+  for (const mission of delayedMissions.slice(0, 5)) {
+    redFlags.push({
+      id: `delayed-mission-${slug(mission.title)}`,
+      title: "Mission delayed",
+      description: `${mission.title} is still ${mission.status} after its planned end date.`,
+      severity: "warning",
+      module: "operations",
+      relatedLabel: mission.project,
+      reasoning: "The mission has an end date earlier than today and is not completed."
+    });
+  }
+
+  for (const invoice of overdueSupplierDebt.slice(0, 5)) {
+    redFlags.push({
+      id: `supplier-overdue-${slug(invoice.supplier)}-${slug(invoice.invoice)}`,
+      title: "Supplier overdue",
+      description: `${invoice.supplier} has unpaid invoice ${invoice.invoice} with ${money(invoice.outstanding)} outstanding.`,
+      severity: invoice.outstanding >= 10000 ? "critical" : "warning",
+      module: "suppliers",
+      relatedLabel: invoice.supplier,
+      reasoning: "The invoice due date has passed and the outstanding balance is still above zero."
+    });
+  }
+
+  for (const tax of overdueTaxes.slice(0, 5)) {
+    redFlags.push({
+      id: `tax-overdue-${slug(tax.type)}-${slug(tax.period)}`,
+      title: "Tax overdue",
+      description: `${tax.type} ${tax.period} has ${money(tax.outstanding)} outstanding.`,
+      severity: "critical",
+      module: "taxes",
+      relatedLabel: tax.type,
+      reasoning: "The tax due date has passed while an unpaid balance remains."
+    });
+  }
+
+  for (const alert of overdueFleetAlerts.slice(0, 5)) {
+    redFlags.push({
+      id: `fleet-overdue-${slug(alert.vehicle)}-${slug(alert.item)}`,
+      title: "Vehicle maintenance overdue",
+      description: `${alert.vehicle} needs ${alert.item}.`,
+      severity: "warning",
+      module: "fleet",
+      relatedLabel: alert.vehicle,
+      reasoning: "The maintenance due date is earlier than today."
+    });
+  }
+
+  if (context.warehouseAlerts.length > 0) {
+    redFlags.push({
+      id: "warehouse-low-stock",
+      title: "Warehouse low stock",
+      description: `${context.warehouseAlerts.length} warehouse items are below minimum stock.`,
+      severity: "warning",
+      module: "warehouse",
+      reasoning: "The warehouse stock snapshot contains low-stock alerts for this month."
+    });
+  }
+
+  if (redFlags.length === 0) {
+    redFlags.push({
+      id: "no-red-flags",
+      title: "No critical red flags detected",
+      description: "The current database summary does not show critical project, finance, fleet, warehouse, supplier, or tax problems.",
+      severity: "info",
+      module: "finance",
+      reasoning: "The intelligence layer checked the available monthly snapshot and live alert lists."
+    });
+  }
+
+  if (lossProjects.length || lowMarginProjects.length) {
+    rootCauses.push({
+      id: "project-cost-pressure",
+      title: "Project cost pressure",
+      severity: lossProjects.length ? "critical" : "warning",
+      reasoning: "Project margins are being reduced by actual costs approaching or exceeding contract value.",
+      linkedTo: { projects: [...lossProjects, ...lowMarginProjects].slice(0, 6).map((project) => project.name) }
+    });
+  }
+
+  if (delayedMissions.length) {
+    rootCauses.push({
+      id: "delivery-delay-pressure",
+      title: "Delivery delay pressure",
+      severity: "warning",
+      reasoning: "Open missions past their planned end date can increase labor, vehicle, and approval costs.",
+      linkedTo: {
+        projects: unique(delayedMissions.map((mission) => mission.project)).slice(0, 6),
+        teams: unique(delayedMissions.map((mission) => mission.team)).slice(0, 6)
+      }
+    });
+  }
+
+  if (overdueSupplierDebt.length || overdueTaxes.length) {
+    rootCauses.push({
+      id: "unpaid-obligations",
+      title: "Unpaid obligations",
+      severity: overdueTaxes.length ? "critical" : "warning",
+      reasoning: "Overdue supplier invoices or taxes can reduce cash flexibility and create operational risk.",
+      linkedTo: { suppliers: overdueSupplierDebt.slice(0, 6).map((invoice) => invoice.supplier) }
+    });
+  }
+
+  if (overdueFleetAlerts.length) {
+    rootCauses.push({
+      id: "fleet-maintenance-backlog",
+      title: "Fleet maintenance backlog",
+      severity: "warning",
+      reasoning: "Vehicles with overdue maintenance can create downtime and unexpected repair costs.",
+      linkedTo: { vehicles: overdueFleetAlerts.slice(0, 6).map((alert) => alert.vehicle) }
+    });
+  }
+
+  if (missingReceipts > 0) {
+    rootCauses.push({
+      id: "receipt-control-gap",
+      title: "Receipt control gap",
+      severity: missingReceipts > 5 ? "critical" : "warning",
+      reasoning: "Expenses are being captured without full supporting documents, which increases verification workload.",
+      linkedTo: {}
+    });
+  }
+
+  if (rootCauses.length === 0) {
+    rootCauses.push({
+      id: "no-root-cause-data",
+      title: "No root cause pattern detected",
+      severity: "info",
+      reasoning: "Available data does not show recurring project, team, supplier, vehicle, or receipt problems.",
+      linkedTo: {}
+    });
+  }
+
+  const cashOutflowHigher = context.currentMonth.financial.cashOutflow > context.currentMonth.financial.cashInflow;
+  if (cashOutflowHigher || (monthlyExpenses > 0 && cash < monthlyExpenses)) {
+    predictions.push({
+      id: "cash-pressure-next-month",
+      title: "Possible cash pressure",
+      description: "Cash may tighten if current spending and outflow patterns continue.",
+      severity: cash < monthlyExpenses ? "critical" : "warning",
+      confidence: cashOutflowHigher && monthlyExpenses > 0 ? "high" : "medium",
+      timeEstimate: "Next 30 days",
+      reasoning: `Cash is ${money(cash)}, monthly expenses are ${money(monthlyExpenses)}, and cash outflow is ${money(context.currentMonth.financial.cashOutflow)}.`
+    });
+  }
+
+  if (lossProjects.length) {
+    predictions.push({
+      id: "project-loss-risk",
+      title: "Potential project losses",
+      description: "Loss-making projects may continue reducing monthly profit unless costs are frozen or repriced.",
+      severity: "critical",
+      confidence: "high",
+      timeEstimate: "This month",
+      reasoning: `${lossProjects.length} projects currently show negative profit in the project risk list.`
+    });
+  }
+
+  if (delayedMissions.length) {
+    predictions.push({
+      id: "mission-delay-risk",
+      title: "Delivery delay risk",
+      description: "Delayed missions may push cost into the next month and slow customer delivery.",
+      severity: "warning",
+      confidence: "medium",
+      timeEstimate: "1-2 weeks",
+      reasoning: `${delayedMissions.length} open missions are past their planned end date.`
+    });
+  }
+
+  if (context.warehouseAlerts.length) {
+    predictions.push({
+      id: "stockout-risk",
+      title: "Stock-out risk",
+      description: "Low stock items may interrupt project execution if they are not replenished.",
+      severity: "warning",
+      confidence: "medium",
+      timeEstimate: "Next 30 days",
+      reasoning: `${context.warehouseAlerts.length} warehouse low-stock alerts are present in the monthly snapshot.`
+    });
+  }
+
+  if (predictions.length === 0) {
+    predictions.push({
+      id: "stable-forecast",
+      title: "No immediate risk predicted",
+      description: "The available monthly snapshot does not show immediate cash, loss, delay, or stock-out risks.",
+      severity: "info",
+      confidence: "medium",
+      timeEstimate: "Next 30 days",
+      reasoning: "No critical red flags were found in the current intelligence categories."
+    });
+  }
+
+  if (lossProjects[0]) {
+    suggestions.push({
+      id: "freeze-loss-project-spend",
+      action: `Review and freeze non-critical spend on ${lossProjects[0].name}.`,
+      reason: "It is the strongest loss-making project in the current project risk list.",
+      expectedImpact: "Protect cash and prevent additional margin erosion.",
+      severity: "critical",
+      priority: 1,
+      module: "projects",
+      relatedLabel: lossProjects[0].name
+    });
+  }
+
+  if (missingReceipts > 0) {
+    suggestions.push({
+      id: "clear-missing-receipts",
+      action: "Ask teams to upload missing receipts before month close.",
+      reason: `${missingReceipts} expense records are missing receipts.`,
+      expectedImpact: "Cleaner approvals, stronger audit trail, and fewer finance blockers.",
+      severity: missingReceipts > 5 ? "critical" : "warning",
+      priority: 2,
+      module: "finance"
+    });
+  }
+
+  if (overdueTaxes[0]) {
+    suggestions.push({
+      id: "resolve-overdue-tax",
+      action: `Prioritize overdue tax ${overdueTaxes[0].type} ${overdueTaxes[0].period}.`,
+      reason: "Tax overdue items create compliance and cash risk.",
+      expectedImpact: "Lower compliance exposure and clearer financial position.",
+      severity: "critical",
+      priority: 1,
+      module: "taxes",
+      relatedLabel: overdueTaxes[0].type
+    });
+  }
+
+  if (overdueSupplierDebt[0]) {
+    suggestions.push({
+      id: "supplier-payment-plan",
+      action: `Create a payment plan for ${overdueSupplierDebt[0].supplier}.`,
+      reason: "This supplier has the highest overdue unpaid balance in the current data.",
+      expectedImpact: "Reduce supplier pressure and protect future purchasing.",
+      severity: overdueSupplierDebt[0].outstanding >= 10000 ? "critical" : "warning",
+      priority: 2,
+      module: "suppliers",
+      relatedLabel: overdueSupplierDebt[0].supplier
+    });
+  }
+
+  if (overdueFleetAlerts[0]) {
+    suggestions.push({
+      id: "schedule-fleet-maintenance",
+      action: `Schedule ${overdueFleetAlerts[0].item} for ${overdueFleetAlerts[0].vehicle}.`,
+      reason: "The due date has already passed.",
+      expectedImpact: "Reduce breakdown risk and service disruption.",
+      severity: "warning",
+      priority: 3,
+      module: "fleet",
+      relatedLabel: overdueFleetAlerts[0].vehicle
+    });
+  }
+
+  if (context.warehouseAlerts.length) {
+    suggestions.push({
+      id: "replenish-low-stock",
+      action: "Replenish low-stock warehouse items used by active projects.",
+      reason: `${context.warehouseAlerts.length} low-stock alerts exist in the warehouse snapshot.`,
+      expectedImpact: "Lower project delay risk from missing materials.",
+      severity: "warning",
+      priority: 3,
+      module: "warehouse"
+    });
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push({
+      id: "weekly-review",
+      action: "Run a weekly Boss review of projects, approvals, cash, fleet, and stock.",
+      reason: "No urgent action is required from the current snapshot, but routine review keeps control tight.",
+      expectedImpact: "Earlier detection of cost, approval, and operational drift.",
+      severity: "info",
+      priority: 5,
+      module: "finance"
+    });
+  }
+
+  return {
+    generatedAt: context.generatedAt,
+    periodLabel: context.period.label,
+    companyOverview: {
+      cash,
+      openProjects,
+      monthlyExpenses,
+      fleetAlerts: context.fleetAlerts.length,
+      warehouseLowStock: context.warehouseAlerts.length,
+      pendingApprovals,
+      dataNotes: [
+        context.cashAccounts.length ? "Cash accounts loaded" : "Cash account data is missing",
+        context.projectRisks.length ? "Project data loaded" : "Project data is missing",
+        "Monthly report snapshot loaded"
+      ]
+    },
+    redFlags: sortBySeverity(redFlags),
+    rootCauses: sortBySeverity(rootCauses),
+    predictions: sortBySeverity(predictions),
+    suggestions: suggestions.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.priority - b.priority),
+    roleAssistance: {
+      mode: "suggest_draft_flag_only",
+      controlledBy: "Boss",
+      note: "The assistant can suggest, draft, and flag issues. Final decisions remain controlled by the Boss.",
+      suggestedPrompts: [
+        "Summarize company performance this month",
+        "Show biggest red flags",
+        "Which projects are risky?",
+        "Where can we reduce costs?",
+        "Create action plan for next week"
+      ]
+    },
+    dataBasis: context.dataBasis
+  };
+}
+
 export async function answerBossQuestion(question: string, context: BossAiContext, locale: string): Promise<BossAiResponse> {
   const sourceCounts = {
     projects: context.projectRisks.length,
@@ -282,4 +732,22 @@ function money(value: number) {
 
 function round(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function sortBySeverity<T extends { severity: IntelligenceSeverity }>(items: T[]) {
+  return [...items].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
+}
+
+function severityRank(severity: IntelligenceSeverity) {
+  if (severity === "critical") return 0;
+  if (severity === "warning") return 1;
+  return 2;
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item";
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
 }

@@ -434,6 +434,72 @@
       "access": "Accès",
       "bossOnly": "Patron seulement"
     },
+    "bossIntelligence": {
+      "eyebrow": "Intelligence structuree",
+      "title": "Couche Intelligence Patron",
+      "description": "Vue par niveaux de ce qui se passe, ce qui ne va pas, pourquoi, ce qui peut arriver ensuite, et les actions a lancer.",
+      "period": "Periode : {{period}}",
+      "dataBasis": "Base des donnees",
+      "reasoning": "Raisonnement",
+      "reason": "Raison",
+      "expectedImpact": "Impact attendu",
+      "prediction": "Prediction",
+      "confidence": "Confiance",
+      "timeEstimate": "Delai estime",
+      "bossControlled": "Controle par le patron",
+      "noLinkedRecords": "Aucun enregistrement lie dans les donnees disponibles.",
+      "noFilteredResults": "Aucun insight ne correspond aux filtres choisis.",
+      "filters": {
+        "allProjects": "Tous les projets",
+        "allDepartments": "Tous les departements",
+        "allTime": "Toute periode",
+        "thisMonth": "Ce mois",
+        "next30": "30 prochains jours"
+      },
+      "levels": {
+        "overview": "Niveau 1 - Vue entreprise",
+        "redFlags": "Niveau 2 - Alertes",
+        "rootCause": "Niveau 3 - Causes racines",
+        "predictions": "Niveau 4 - Predictions",
+        "suggestions": "Niveau 5 - Suggestions intelligentes",
+        "roleAssistance": "Niveau 6 - Assistance IA"
+      },
+      "levelDescriptions": {
+        "overview": "Etat actuel de la caisse, des projets, depenses, flotte, stock et validations.",
+        "redFlags": "Problemes critiques et avertissements classes par priorite.",
+        "rootCause": "Pourquoi les problemes arrivent et a quels enregistrements ils sont lies.",
+        "predictions": "Risques probables avec confiance et delai.",
+        "suggestions": "Actions recommandees avec raison et impact attendu.",
+        "roleAssistance": "L'assistant peut suggerer, rediger et signaler, mais le patron garde la decision."
+      },
+      "overview": {
+        "cash": "Tresorerie",
+        "projects": "Projets ouverts",
+        "expenses": "Depenses mensuelles",
+        "fleet": "Alertes flotte",
+        "warehouse": "Stock bas",
+        "pending": "Validations en attente"
+      },
+      "modules": {
+        "finance": "Finance",
+        "projects": "Projets",
+        "operations": "Operations",
+        "fleet": "Flotte",
+        "warehouse": "Stock",
+        "suppliers": "Fournisseurs",
+        "taxes": "Taxes"
+      },
+      "severity": {
+        "critical": "Critique",
+        "warning": "Avertissement",
+        "info": "Info"
+      },
+      "confidenceLevels": {
+        "high": "Haute",
+        "medium": "Moyenne",
+        "low": "Faible"
+      }
+    },
     "bossAi": {
       "eyebrow": "Intelligence patron",
       "title": "Assistant Intelligence SCADACOM",

@@ -434,6 +434,72 @@
       "access": "Access",
       "bossOnly": "Boss only"
     },
+    "bossIntelligence": {
+      "eyebrow": "Structured intelligence",
+      "title": "Boss Intelligence Layer",
+      "description": "A staged view of what is happening, what is wrong, why it is happening, what may happen next, and what action to take.",
+      "period": "Period: {{period}}",
+      "dataBasis": "Data basis",
+      "reasoning": "Reasoning",
+      "reason": "Reason",
+      "expectedImpact": "Expected impact",
+      "prediction": "Prediction",
+      "confidence": "Confidence",
+      "timeEstimate": "Time estimate",
+      "bossControlled": "Boss controlled",
+      "noLinkedRecords": "No linked records in the available data.",
+      "noFilteredResults": "No insights match the selected filters.",
+      "filters": {
+        "allProjects": "All projects",
+        "allDepartments": "All departments",
+        "allTime": "All time",
+        "thisMonth": "This month",
+        "next30": "Next 30 days"
+      },
+      "levels": {
+        "overview": "Level 1 - Company Overview",
+        "redFlags": "Level 2 - Red Flags",
+        "rootCause": "Level 3 - Root Cause Analysis",
+        "predictions": "Level 4 - Predictions",
+        "suggestions": "Level 5 - Smart Suggestions",
+        "roleAssistance": "Level 6 - AI Role Assistance"
+      },
+      "levelDescriptions": {
+        "overview": "Current state of cash, projects, expenses, fleet, warehouse, and approvals.",
+        "redFlags": "Critical and warning issues ordered by priority.",
+        "rootCause": "Why the problems are happening and which records they connect to.",
+        "predictions": "Likely future risks with confidence and timing.",
+        "suggestions": "Recommended actions with reason and expected impact.",
+        "roleAssistance": "The assistant can suggest, draft, and flag, but the Boss controls decisions."
+      },
+      "overview": {
+        "cash": "Cash",
+        "projects": "Open projects",
+        "expenses": "Monthly expenses",
+        "fleet": "Fleet alerts",
+        "warehouse": "Low stock",
+        "pending": "Pending approvals"
+      },
+      "modules": {
+        "finance": "Finance",
+        "projects": "Projects",
+        "operations": "Operations",
+        "fleet": "Fleet",
+        "warehouse": "Warehouse",
+        "suppliers": "Suppliers",
+        "taxes": "Taxes"
+      },
+      "severity": {
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Info"
+      },
+      "confidenceLevels": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
     "bossAi": {
       "eyebrow": "Boss intelligence",
       "title": "SCADACOM Intelligence Assistant",
