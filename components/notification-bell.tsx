@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, X } from "lucide-react";
 import { translate, type Locale } from "@/lib/i18n";
 
 type NotificationItem = {
@@ -53,6 +53,17 @@ export function NotificationBell({ locale }: { locale: Locale }) {
     const timer = window.setInterval(loadNotifications, 30000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    if (!isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   async function markAllRead() {
     await fetch("/api/notifications/read-all", { method: "POST" });
@@ -122,19 +133,26 @@ export function NotificationBell({ locale }: { locale: Locale }) {
         {unreadCount > 0 ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-bold text-white">{unreadCount}</span> : null}
       </button>
       {open ? (
-        <div className="absolute end-0 top-12 z-50 w-[min(92vw,420px)] rounded-lg border border-black/10 bg-white p-3 shadow-xl">
-          <div className="flex items-center justify-between gap-3 border-b border-black/10 pb-3">
+        <>
+        <button className="fixed inset-0 z-[70] bg-black/20 md:hidden" aria-label="Close notifications" onClick={() => setOpen(false)} type="button" />
+        <div className="fixed inset-x-3 bottom-3 z-[80] flex max-h-[75vh] w-[calc(100vw-24px)] flex-col overflow-hidden rounded-lg border border-black/10 bg-white p-3 shadow-2xl md:absolute md:inset-x-auto md:bottom-auto md:end-0 md:top-12 md:z-50 md:max-h-none md:w-[min(92vw,420px)] md:shadow-xl">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-black/10 pb-3">
             <div>
               <p className="font-semibold text-ink">{translate(locale, "notifications.center")}</p>
               <p className="text-xs text-stone-500">{translate(locale, "notifications.polling")}</p>
             </div>
-            <button className="inline-flex items-center gap-1 rounded-md border border-black/10 px-2 py-1 text-xs font-semibold" onClick={markAllRead} type="button">
-              <CheckCheck size={14} />
-              {translate(locale, "notifications.markAllRead")}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button className="inline-flex items-center gap-1 rounded-md border border-black/10 px-2 py-1 text-xs font-semibold" onClick={markAllRead} type="button">
+                <CheckCheck size={14} />
+                {translate(locale, "notifications.markAllRead")}
+              </button>
+              <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-black/10 md:hidden" onClick={() => setOpen(false)} type="button" aria-label="Close notifications">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto py-2">
+          <div className="min-h-0 flex-1 overflow-y-auto py-2">
             {latest.length > 0 ? latest.map((item) => (
               <button
                 className={`mb-2 w-full rounded-md border p-3 text-start ${item.isRead ? "border-black/10 bg-white" : "border-mint/30 bg-mint/5"}`}
@@ -152,7 +170,7 @@ export function NotificationBell({ locale }: { locale: Locale }) {
             )) : <p className="rounded-md border border-dashed border-stone-300 p-4 text-sm text-stone-500">{translate(locale, "notifications.empty")}</p>}
           </div>
 
-          <div className="space-y-2 border-t border-black/10 pt-3 text-xs">
+          <div className="shrink-0 space-y-2 border-t border-black/10 pt-3 text-xs">
             <button className="rounded-md border border-black/10 px-3 py-2 font-semibold" onClick={enablePush} type="button">{translate(locale, "notifications.enablePush")}</button>
             {pushStatus ? <p className="text-stone-500">{pushStatus}</p> : null}
             <label className="flex items-center justify-between gap-3">
@@ -165,6 +183,7 @@ export function NotificationBell({ locale }: { locale: Locale }) {
             </label>
           </div>
         </div>
+        </>
       ) : null}
     </div>
   );
