@@ -28,6 +28,8 @@ type PageProps = {
   searchParams?: Promise<{ importId?: string }>;
 };
 
+const previewRowLimit = 120;
+
 export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -71,17 +73,28 @@ export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps)
     ? await prisma.excelSiteCostRow.findMany({
         where: rowWhere,
         orderBy: [{ sheetName: "asc" }, { rowNumber: "asc" }],
+        take: previewRowLimit,
         include: { matchedProject: { select: { id: true, name: true, siteId: true } } }
       })
     : [];
+  const totalMatchingRows = selectedImport ? await prisma.excelSiteCostRow.count({ where: rowWhere }) : 0;
   const projects = canManage
     ? await prisma.project.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, siteId: true, client: true } })
     : [];
 
-  const visibleSummary = buildVisibleSummary(rows);
+  const visibleSummary = selectedImport?.summary ? buildSummaryFromImportSummary(selectedImport.summary) : buildVisibleSummary(rows);
   const headers = Array.from(new Set(selectedImport?.sheets.flatMap((sheet) => (Array.isArray(sheet.headers) ? sheet.headers.map(String) : [])) ?? []));
   const columnMapping = (selectedImport?.columnMapping ?? {}) as Partial<Record<ExcelCostField, string>>;
-  const importableRows = rows.filter((row) => row.matchedProjectId && Number(row.totalCost) > 0 && !["DUPLICATE", "REJECTED", "IMPORTED"].includes(row.status));
+  const importableRowsCount = selectedImport
+    ? await prisma.excelSiteCostRow.count({
+        where: {
+          ...rowWhere,
+          matchedProjectId: { not: null },
+          totalCost: { gt: 0 },
+          status: { notIn: ["DUPLICATE", "REJECTED", "IMPORTED"] }
+        }
+      })
+    : 0;
 
   return (
     <>
@@ -137,6 +150,16 @@ export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps)
 
       {selectedImport ? (
         <>
+          {selectedImport.status === "FAILED" ? (
+            <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-900 shadow-sm">
+              <h2 className="text-lg font-semibold">Analysis failed safely</h2>
+              <p className="mt-2">
+                This import did not finish, but the application stayed stable. Upload the file again after the latest deploy finishes, or use a smaller selected sheet set.
+              </p>
+              {selectedImport.notes ? <p className="mt-3 rounded-md bg-white/70 p-3 font-mono text-xs">{selectedImport.notes}</p> : null}
+            </section>
+          ) : null}
+
           <section className="mt-6 grid gap-4 md:grid-cols-4">
             <MetricCard label="Total rows" value={visibleSummary.totalRows.toLocaleString("fr-MA")} />
             <MetricCard label="Total site cost" value={mad(visibleSummary.totalCost)} />
@@ -254,7 +277,11 @@ export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps)
                 </tbody>
               </table>
             </div>
-            {rows.length > 80 ? <p className="mt-3 text-sm text-stone-500">Showing first 80 rows. Export the report for the full dataset.</p> : null}
+            {totalMatchingRows > rows.length ? (
+              <p className="mt-3 text-sm text-stone-500">
+                Showing first {rows.length.toLocaleString("fr-MA")} of {totalMatchingRows.toLocaleString("fr-MA")} analyzed rows. Export the report for the full dataset.
+              </p>
+            ) : null}
           </section>
 
           <section id="profitability-analysis" className="mt-6 rounded-lg border border-black/10 bg-white p-5 shadow-sm">
@@ -291,7 +318,7 @@ export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps)
             <div className="mt-4 rounded-md border border-dashed border-black/20 bg-field p-4 text-sm">
               <p className="font-semibold text-ink">Safe preview status</p>
               <p className="mt-1 text-stone-600">This Excel import has not changed live project costs unless the status is IMPORTED.</p>
-              <p className="mt-2 text-stone-700">{importableRows.length} matched positive row(s) are ready for approval. Duplicates, rejected rows, and unmatched rows are skipped.</p>
+              <p className="mt-2 text-stone-700">{importableRowsCount.toLocaleString("fr-MA")} matched positive row(s) are ready for approval. Duplicates, rejected rows, and unmatched rows are skipped.</p>
             </div>
             <div className="mt-4 flex flex-col gap-3 md:flex-row">
               {canApprove && !["IMPORTED", "REJECTED"].includes(selectedImport.status) ? (
@@ -437,6 +464,39 @@ function buildVisibleSummary(rows: Array<{
     revenueBySite,
     redFlags: Array.from(redFlags.entries()).sort((a, b) => b[1] - a[1])
   };
+}
+
+function buildSummaryFromImportSummary(summary: {
+  totalRows: number;
+  duplicateRows: number;
+  unmatchedRows: number;
+  totalCost: unknown;
+  totalBySite: unknown;
+  totalByProject: unknown;
+  totalByCategory: unknown;
+  totalByTeam: unknown;
+  redFlags: unknown;
+}) {
+  return {
+    totalRows: summary.totalRows,
+    totalCost: Number(summary.totalCost ?? 0),
+    duplicateRows: summary.duplicateRows,
+    unmatchedRows: summary.unmatchedRows,
+    bySite: jsonNumberEntries(summary.totalBySite),
+    byProject: jsonNumberEntries(summary.totalByProject),
+    byCategory: jsonNumberEntries(summary.totalByCategory),
+    byTeam: jsonNumberEntries(summary.totalByTeam),
+    revenueBySite: [],
+    redFlags: jsonNumberEntries(summary.redFlags).map(([flag, count]) => [flag, Math.round(count)] as [string, number])
+  };
+}
+
+function jsonNumberEntries(value: unknown): Array<[string, number]> {
+  if (!value || Array.isArray(value) || typeof value !== "object") return [];
+  return Object.entries(value as Record<string, unknown>)
+    .map(([label, amount]) => [label, Number(amount ?? 0)] as [string, number])
+    .filter(([, amount]) => Number.isFinite(amount) && amount !== 0)
+    .sort((a, b) => b[1] - a[1]);
 }
 
 function totals<T>(rows: T[], labelFor: (row: T) => string): Array<[string, number]> {
