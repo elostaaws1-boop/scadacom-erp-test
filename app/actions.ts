@@ -12,6 +12,16 @@ import { auth } from "@/auth";
 import { audit } from "@/lib/audit";
 import { canAccessProject } from "@/lib/access";
 import { allowanceRateToMad, canSpendProject, isForbiddenFieldExpense, missionDays, recalculateProjectCost } from "@/lib/business";
+import {
+  canApproveExcelCostImport,
+  canManageExcelCostAnalyzer,
+  createExcelCostImportFromFile,
+  excelCostFields,
+  rebuildExcelCostSummary,
+  updateExcelCostColumnMapping,
+  updateExcelCostSheetSelection,
+  type ExcelCostColumnMapping
+} from "@/lib/excel-cost-analyzer";
 import { createInviteToken, hashToken } from "@/lib/invite";
 import { notifyApprovalDecision, notifySubmitted } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -196,18 +206,120 @@ export async function createEmployee(formData: FormData) {
   revalidatePath("/employees");
 }
 
-export async function createTeam(formData: FormData) {
-  const user = await currentUser();
-  if (!["BOSS", "GENERAL_MANAGER", "SUPER_ADMIN", "ADMIN"].includes(user.role)) throw new Error("Not allowed");
-  const memberIds = formData.getAll("memberIds").map(String).filter(Boolean);
-  const team = await prisma.team.create({
-    data: {
-      name: text(formData, "name"),
-      leaderId: text(formData, "leaderId") || null,
-      members: { create: memberIds.map((employeeId) => ({ employeeId })) }
+export type TeamActionState = {
+  ok: boolean;
+  messageKey?: string;
+};
+
+const teamStatuses = ["AVAILABLE", "ASSIGNED", "ON_MISSION", "INACTIVE"];
+
+function canManageTeams(role: Role) {
+  return ["BOSS", "GENERAL_MANAGER", "SUPER_ADMIN", "ADMIN"].includes(role);
+}
+
+function canOverrideTeamVehicle(role: Role) {
+  return ["BOSS", "GENERAL_MANAGER", "SUPER_ADMIN", "ADMIN"].includes(role);
+}
+
+export async function createTeam(_previous: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  try {
+    const user = await currentUser();
+    if (!canManageTeams(user.role)) return { ok: false, messageKey: "pages.teams.validation.notAllowed" };
+
+    const name = text(formData, "name");
+    const leaderId = text(formData, "leaderId");
+    const technicianIds = Array.from(new Set(formData.getAll("technicianIds").map(String).filter(Boolean)));
+    const driverId = text(formData, "driverId") || null;
+    const vehicleId = text(formData, "vehicleId") || null;
+    const projectId = text(formData, "projectId") || null;
+    const requestedStatus = text(formData, "status") || "AVAILABLE";
+    const status = teamStatuses.includes(requestedStatus) ? requestedStatus : "AVAILABLE";
+    const notes = text(formData, "notes") || null;
+    const allowLeaderAsTechnician = formData.get("allowLeaderAsTechnician") === "on";
+    const overrideVehicleConflict = formData.get("overrideVehicleConflict") === "on";
+
+    if (!name) return { ok: false, messageKey: "pages.teams.validation.nameRequired" };
+    if (!leaderId) return { ok: false, messageKey: "pages.teams.validation.leaderRequired" };
+    if (technicianIds.length === 0) return { ok: false, messageKey: "pages.teams.validation.technicianRequired" };
+    if (technicianIds.includes(leaderId) && !allowLeaderAsTechnician) return { ok: false, messageKey: "pages.teams.validation.leaderTechnicianConflict" };
+
+    const leader = await prisma.employee.findFirst({ where: { id: leaderId, active: true, role: "TEAM_LEADER" } });
+    if (!leader) return { ok: false, messageKey: "pages.teams.validation.invalidLeader" };
+
+    const technicians = await prisma.employee.findMany({ where: { id: { in: technicianIds }, active: true, role: "TECHNICIAN" }, select: { id: true } });
+    if (technicians.length !== technicianIds.length) return { ok: false, messageKey: "pages.teams.validation.invalidTechnician" };
+
+    if (driverId) {
+      const driver = await prisma.employee.findFirst({ where: { id: driverId, active: true } });
+      if (!driver) return { ok: false, messageKey: "pages.teams.validation.invalidDriver" };
+      if ([leaderId, ...technicianIds].includes(driverId)) return { ok: false, messageKey: "pages.teams.validation.duplicateEmployee" };
     }
-  });
-  await audit({ actorId: user.id, action: "CREATE", entity: "Team", entityId: team.id, after: { ...team, memberIds } });
+
+    if (vehicleId) {
+      const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+      if (!vehicle) return { ok: false, messageKey: "pages.teams.validation.invalidVehicle" };
+      const conflict = await prisma.team.findFirst({
+        where: {
+          vehicleId,
+          status: { in: ["ASSIGNED", "ON_MISSION"] }
+        },
+        select: { id: true, name: true }
+      });
+      if (conflict && (!overrideVehicleConflict || !canOverrideTeamVehicle(user.role))) {
+        return { ok: false, messageKey: "pages.teams.validation.vehicleConflict" };
+      }
+    }
+
+    if (projectId) {
+      const project = await prisma.project.findFirst({ where: { id: projectId, status: { in: ["PLANNED", "ACTIVE", "ON_HOLD"] } } });
+      if (!project) return { ok: false, messageKey: "pages.teams.validation.invalidProject" };
+    }
+
+    const team = await prisma.team.create({
+      data: {
+        name,
+        leaderId,
+        driverId,
+        vehicleId,
+        projectId,
+        status,
+        notes,
+        members: { create: technicianIds.map((employeeId) => ({ employeeId })) }
+      }
+    });
+    await audit({ actorId: user.id, action: "CREATE", entity: "Team", entityId: team.id, after: { ...team, technicianIds } });
+    revalidatePath("/teams");
+    return { ok: true, messageKey: "pages.teams.validation.created" };
+  } catch (error) {
+    console.error("Team creation failed", error);
+    return { ok: false, messageKey: "pages.teams.validation.failed" };
+  }
+}
+
+export async function deactivateTeam(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageTeams(user.role)) throw new Error("Not allowed");
+  const id = text(formData, "id");
+  const before = await prisma.team.findUniqueOrThrow({ where: { id } });
+  const updated = await prisma.team.update({ where: { id }, data: { status: "INACTIVE" } });
+  await audit({ actorId: user.id, action: "DEACTIVATE", entity: "Team", entityId: id, before, after: updated });
+  revalidatePath("/teams");
+  revalidatePath(`/teams/${id}`);
+}
+
+export async function deleteOrArchiveTeam(formData: FormData) {
+  const user = await currentUser();
+  if (!["BOSS", "SUPER_ADMIN"].includes(user.role)) throw new Error("Only Boss can delete teams.");
+  const id = text(formData, "id");
+  const before = await prisma.team.findUniqueOrThrow({ where: { id }, include: { missions: { select: { id: true } } } });
+  if (before.missions.length > 0) {
+    const updated = await prisma.team.update({ where: { id }, data: { status: "INACTIVE" } });
+    await audit({ actorId: user.id, action: "ARCHIVE_WITH_HISTORY", entity: "Team", entityId: id, before, after: updated });
+  } else {
+    await audit({ actorId: user.id, action: "DELETE", entity: "Team", entityId: id, before });
+    await prisma.teamMember.deleteMany({ where: { teamId: id } });
+    await prisma.team.delete({ where: { id } });
+  }
   revalidatePath("/teams");
 }
 
@@ -811,4 +923,249 @@ export async function acceptInvite(token: string, formData: FormData) {
   await prisma.inviteUsageLog.create({ data: { inviteId: invite.id, email: invite.email, success: true } });
   await audit({ actorId: user.id, action: "ACCEPT", entity: "Invite", entityId: invite.id, after: { userId: user.id } });
   redirect("/login");
+}
+
+export type ExcelCostAnalyzerState = {
+  ok: boolean;
+  message: string;
+  importId?: string;
+};
+
+export async function uploadExcelCostFile(_previous: ExcelCostAnalyzerState, formData: FormData): Promise<ExcelCostAnalyzerState> {
+  try {
+    const user = await currentUser();
+    if (!canManageExcelCostAnalyzer(user.role)) {
+      return { ok: false, message: "Your role is not allowed to upload Excel cost files." };
+    }
+
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false, message: "Upload an Excel file first." };
+    }
+
+    const result = await createExcelCostImportFromFile({
+      file,
+      userId: user.id,
+      notes: text(formData, "notes")
+    });
+
+    await audit({
+      actorId: user.id,
+      action: "UPLOAD_EXCEL_COST_ANALYSIS",
+      entity: "ExcelImport",
+      entityId: result.importId,
+      after: result,
+      financialAction: true
+    });
+
+    revalidatePath("/excel-cost-analyzer");
+    return {
+      ok: true,
+      importId: result.importId,
+      message: `${result.fileName} analyzed: ${result.sheetCount} sheet(s), ${result.rowCount} row(s).`
+    };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Excel analysis failed." };
+  }
+}
+
+export async function selectExcelCostSheets(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageExcelCostAnalyzer(user.role)) throw new Error("Not allowed");
+  const importId = text(formData, "importId");
+  const selectedSheets = formData.getAll("selectedSheets").map(String).filter(Boolean);
+  if (selectedSheets.length === 0) throw new Error("Select at least one sheet.");
+
+  await updateExcelCostSheetSelection({ importId, selectedSheets });
+  await audit({
+    actorId: user.id,
+    action: "SELECT_EXCEL_COST_SHEETS",
+    entity: "ExcelImport",
+    entityId: importId,
+    after: { selectedSheets },
+    financialAction: true
+  });
+  revalidatePath("/excel-cost-analyzer");
+  redirect(`/excel-cost-analyzer?importId=${importId}`);
+}
+
+export async function remapExcelCostColumns(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageExcelCostAnalyzer(user.role)) throw new Error("Not allowed");
+  const importId = text(formData, "importId");
+  const columnMapping = excelCostFields.reduce<ExcelCostColumnMapping>((mapping, field) => {
+    const value = text(formData, field);
+    if (value) mapping[field] = value;
+    return mapping;
+  }, {});
+
+  await updateExcelCostColumnMapping({ importId, columnMapping });
+  await audit({
+    actorId: user.id,
+    action: "MAP_EXCEL_COST_COLUMNS",
+    entity: "ExcelImport",
+    entityId: importId,
+    after: { columnMapping },
+    financialAction: true
+  });
+  revalidatePath("/excel-cost-analyzer");
+  redirect(`/excel-cost-analyzer?importId=${importId}`);
+}
+
+export async function assignExcelCostRowProject(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageExcelCostAnalyzer(user.role)) throw new Error("Not allowed");
+  const rowId = text(formData, "rowId");
+  const projectId = text(formData, "projectId");
+  if (!(await canAccessProject(user, projectId))) throw new Error("Not allowed for this project.");
+
+  const [row, project] = await Promise.all([
+    prisma.excelSiteCostRow.findUnique({ where: { id: rowId } }),
+    prisma.project.findUnique({ where: { id: projectId }, select: { id: true, name: true, siteId: true } })
+  ]);
+  if (!row || !project) throw new Error("Row or project not found.");
+
+  const warnings = Array.isArray(row.warnings)
+    ? row.warnings.map(String).filter((flag) => !["Unmatched project", "Missing project", "Missing site ID"].includes(flag))
+    : [];
+
+  const updated = await prisma.excelSiteCostRow.update({
+    where: { id: rowId },
+    data: {
+      matchedProjectId: project.id,
+      projectName: project.name,
+      siteId: project.siteId,
+      status: row.status === "DUPLICATE" ? "DUPLICATE" : "MATCHED",
+      warnings
+    }
+  });
+  await rebuildExcelCostSummary(row.importId);
+  await audit({
+    actorId: user.id,
+    action: "ASSIGN_EXCEL_COST_ROW",
+    entity: "ExcelSiteCostRow",
+    entityId: rowId,
+    before: row,
+    after: updated,
+    projectId: project.id,
+    financialAction: true
+  });
+  revalidatePath("/excel-cost-analyzer");
+  redirect(`/excel-cost-analyzer?importId=${row.importId}`);
+}
+
+export async function rejectExcelCostImport(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageExcelCostAnalyzer(user.role)) throw new Error("Not allowed");
+  const importId = text(formData, "importId");
+  const reason = text(formData, "reason");
+  const before = await prisma.excelImport.findUnique({ where: { id: importId } });
+  if (!before) throw new Error("Import not found.");
+  if (before.status === "IMPORTED") throw new Error("Imported Excel costs cannot be rejected.");
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.excelSiteCostRow.updateMany({
+      where: { importId, status: { not: "IMPORTED" } },
+      data: { status: "REJECTED" }
+    });
+    return tx.excelImport.update({
+      where: { id: importId },
+      data: { status: "REJECTED", notes: reason || before.notes }
+    });
+  });
+
+  await audit({
+    actorId: user.id,
+    action: "REJECT_EXCEL_COST_IMPORT",
+    entity: "ExcelImport",
+    entityId: importId,
+    before,
+    after: updated,
+    reason,
+    financialAction: true
+  });
+  revalidatePath("/excel-cost-analyzer");
+  redirect(`/excel-cost-analyzer?importId=${importId}`);
+}
+
+export async function approveExcelCostImport(formData: FormData) {
+  const user = await currentUser();
+  if (!canApproveExcelCostImport(user.role)) throw new Error("Only Boss or Finance can approve Excel cost imports.");
+  const importId = text(formData, "importId");
+  const reason = text(formData, "reason");
+  const excelImport = await prisma.excelImport.findUnique({
+    where: { id: importId },
+    include: { siteRows: true }
+  });
+  if (!excelImport) throw new Error("Import not found.");
+  if (["REJECTED", "IMPORTED"].includes(excelImport.status)) throw new Error("This import is already closed.");
+
+  const importableRows = excelImport.siteRows.filter((row) =>
+    row.matchedProjectId &&
+    Number(row.totalCost) > 0 &&
+    !["DUPLICATE", "REJECTED", "IMPORTED"].includes(row.status)
+  );
+  if (importableRows.length === 0) throw new Error("No matched, positive, non-duplicate rows are ready to import.");
+
+  const imported = await prisma.$transaction(async (tx) => {
+    const createdExpenses: Array<{ id: string; projectId: string; amount: number }> = [];
+    for (const row of importableRows) {
+      const mapped = (row.mappedData ?? {}) as Record<string, unknown>;
+      const description = [mapped.description, mapped.employee, mapped.supplier, mapped.vehicle, mapped.notes]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+        .join(" / ");
+      const expense = await tx.expense.create({
+        data: {
+          projectId: row.matchedProjectId!,
+          submittedById: user.id,
+          category: `Excel site cost: ${row.profitabilityStatus}`,
+          amount: Number(row.totalCost),
+          approvedAmount: Number(row.totalCost),
+          adminOverride: true,
+          notes: [
+            `Excel Site Profitability Analyzer import: ${excelImport.fileName}`,
+            `Sheet ${row.sheetName}, row ${row.rowNumber}`,
+            `Site ${row.siteId ?? "missing"} / Revenue ${row.revenue ?? "missing"} / Profit ${row.profitLoss ?? "missing"}`,
+            description
+          ].filter(Boolean).join(" | "),
+          status: "APPROVED"
+        }
+      });
+      await tx.excelSiteCostRow.update({
+        where: { id: row.id },
+        data: {
+          status: "IMPORTED",
+          mappedData: { ...mapped, importedExpenseId: expense.id }
+        }
+      });
+      createdExpenses.push({ id: expense.id, projectId: expense.projectId, amount: Number(expense.amount) });
+    }
+
+    await tx.excelImport.update({
+      where: { id: importId },
+      data: { status: "IMPORTED", notes: reason || excelImport.notes, approvedById: user.id, approvedAt: new Date() }
+    });
+    return createdExpenses;
+  });
+
+  for (const projectId of Array.from(new Set(imported.map((expense) => expense.projectId)))) {
+    await recalculateProjectCost(projectId);
+  }
+
+  await audit({
+    actorId: user.id,
+    action: "APPROVE_EXCEL_COST_IMPORT",
+    entity: "ExcelImport",
+    entityId: importId,
+    before: { status: excelImport.status, rows: excelImport.siteRows.length },
+    after: { importedExpenses: imported.length, totalAmount: imported.reduce((sum, item) => sum + item.amount, 0) },
+    reason,
+    financialAction: true
+  });
+  revalidatePath("/excel-cost-analyzer");
+  revalidatePath("/expenses");
+  revalidatePath("/projects");
+  revalidatePath("/dashboard");
+  redirect(`/excel-cost-analyzer?importId=${importId}`);
 }

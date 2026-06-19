@@ -28,6 +28,22 @@ export type BossAiContext = {
   openMissions: Array<{ title: string; project: string; team: string; status: string; days: number; endDate: string | null }>;
   pendingApprovals: { expenses: number; purchases: number; advances: number };
   cashAccounts: Array<{ name: string; type: string; balance: number }>;
+  excelCostImports: Array<{
+    id: string;
+    fileName: string;
+    status: string;
+    uploadedAt: string;
+    totalRows: number;
+    totalAmount: number;
+    totalCost: number;
+    totalRevenue: number;
+    totalProfitLoss: number;
+    lossMakingSitesCount: number;
+    warningCount: number;
+    duplicateRows: number;
+    unmatchedRows: number;
+    redFlags: Record<string, number>;
+  }>;
   dataBasis: string[];
 };
 
@@ -127,7 +143,8 @@ export async function buildBossAiContext(date = new Date()): Promise<BossAiConte
     pendingPurchases,
     pendingAdvances,
     cashAccounts,
-    latestLockedReport
+    latestLockedReport,
+    excelCostImports
   ] = await Promise.all([
     prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 50 }),
     prisma.supplierInvoice.findMany({ include: { supplier: true }, orderBy: { dueDate: "asc" }, take: 50 }),
@@ -143,7 +160,12 @@ export async function buildBossAiContext(date = new Date()): Promise<BossAiConte
     prisma.purchase.count({ where: { status: ApprovalStatus.PENDING } }),
     prisma.advanceRequest.count({ where: { status: ApprovalStatus.PENDING } }),
     prisma.cashAccount.findMany({ orderBy: { name: "asc" } }),
-    prisma.monthlyPerformanceReport.findFirst({ where: { status: "LOCKED" }, orderBy: [{ year: "desc" }, { month: "desc" }] })
+    prisma.monthlyPerformanceReport.findFirst({ where: { status: "LOCKED" }, orderBy: [{ year: "desc" }, { month: "desc" }] }),
+    prisma.excelImport.findMany({
+      orderBy: { uploadedAt: "desc" },
+      take: 8,
+      include: { summary: true }
+    })
   ]);
 
   const projectRisks = projects
@@ -233,6 +255,22 @@ export async function buildBossAiContext(date = new Date()): Promise<BossAiConte
     })),
     pendingApprovals: { expenses: pendingExpenses, purchases: pendingPurchases, advances: pendingAdvances },
     cashAccounts: cashAccounts.map((account) => ({ name: account.name, type: account.type, balance: Number(account.balance) })),
+    excelCostImports: excelCostImports.map((item) => ({
+      id: item.id,
+      fileName: item.fileName,
+      status: item.status,
+      uploadedAt: item.uploadedAt.toISOString(),
+      totalRows: item.summary?.totalRows ?? 0,
+      totalAmount: Number(item.summary?.totalAmount ?? 0),
+      totalCost: Number(item.summary?.totalCost ?? item.summary?.totalAmount ?? 0),
+      totalRevenue: Number(item.summary?.totalRevenue ?? 0),
+      totalProfitLoss: Number(item.summary?.totalProfitLoss ?? 0),
+      lossMakingSitesCount: item.summary?.lossMakingSitesCount ?? 0,
+      warningCount: item.summary?.warningCount ?? 0,
+      duplicateRows: item.summary?.duplicateRows ?? 0,
+      unmatchedRows: item.summary?.unmatchedRows ?? 0,
+      redFlags: (item.summary?.redFlags as Record<string, number> | null) ?? {}
+    })),
     dataBasis: [
       "Current month generated snapshot",
       "Projects",
@@ -244,7 +282,8 @@ export async function buildBossAiContext(date = new Date()): Promise<BossAiConte
       "Fleet records",
       "Warehouse stock",
       "Missions",
-      "Monthly performance reports"
+      "Monthly performance reports",
+      "Excel Cost Analyzer imports"
     ]
   };
 }
@@ -272,6 +311,7 @@ export function buildBossIntelligenceFromContext(context: BossAiContext): BossIn
   const overdueTaxes = context.taxes.filter((tax) => tax.overdue);
   const overdueFleetAlerts = context.fleetAlerts.filter((alert) => new Date(alert.dueDate) < now);
   const missingReceipts = context.currentMonth.expenseAnalysis.expensesWithoutReceipts;
+  const riskyExcelImports = context.excelCostImports.filter((item) => item.duplicateRows > 0 || item.unmatchedRows > 0 || item.lossMakingSitesCount > 0 || item.warningCount > 0 || Object.keys(item.redFlags).length > 0);
 
   for (const project of lossProjects.slice(0, 5)) {
     redFlags.push({
@@ -367,6 +407,18 @@ export function buildBossIntelligenceFromContext(context: BossAiContext): BossIn
     });
   }
 
+  for (const excelImport of riskyExcelImports.slice(0, 4)) {
+    redFlags.push({
+      id: `excel-import-${slug(excelImport.id)}`,
+      title: "Excel cost import needs review",
+      description: `${excelImport.fileName} has ${excelImport.duplicateRows} duplicate rows, ${excelImport.unmatchedRows} unmatched rows, and ${excelImport.lossMakingSitesCount} loss-making sites before approval/import.`,
+      severity: excelImport.unmatchedRows > 5 || excelImport.duplicateRows > 5 || excelImport.lossMakingSitesCount > 0 ? "critical" : "warning",
+      module: "finance",
+      relatedLabel: excelImport.fileName,
+      reasoning: "The Excel Cost Analyzer summary includes duplicate, unmatched, or flagged rows. These costs should not be approved until reviewed."
+    });
+  }
+
   if (redFlags.length === 0) {
     redFlags.push({
       id: "no-red-flags",
@@ -427,6 +479,16 @@ export function buildBossIntelligenceFromContext(context: BossAiContext): BossIn
       title: "Receipt control gap",
       severity: missingReceipts > 5 ? "critical" : "warning",
       reasoning: "Expenses are being captured without full supporting documents, which increases verification workload.",
+      linkedTo: {}
+    });
+  }
+
+  if (riskyExcelImports.length) {
+    rootCauses.push({
+      id: "excel-cost-data-quality",
+      title: "Excel cost data quality gap",
+      severity: riskyExcelImports.some((item) => item.unmatchedRows > 5 || item.duplicateRows > 5) ? "critical" : "warning",
+      reasoning: "Recent Excel cost imports contain unmatched projects, duplicates, or unknown categories. The assistant uses only imported summary counts and does not infer missing rows.",
       linkedTo: {}
     });
   }
@@ -524,6 +586,19 @@ export function buildBossIntelligenceFromContext(context: BossAiContext): BossIn
       severity: missingReceipts > 5 ? "critical" : "warning",
       priority: 2,
       module: "finance"
+    });
+  }
+
+  if (riskyExcelImports[0]) {
+    suggestions.push({
+      id: "review-excel-cost-import",
+      action: `Review Excel import ${riskyExcelImports[0].fileName} before approval.`,
+      reason: "The import has duplicate, unmatched, warning, or loss-making site rows in the Excel Site Profitability Analyzer summary.",
+      expectedImpact: "Prevent bad Excel rows from changing project costs and focus review on loss-making sites.",
+      severity: riskyExcelImports[0].unmatchedRows > 5 || riskyExcelImports[0].duplicateRows > 5 || riskyExcelImports[0].lossMakingSitesCount > 0 ? "critical" : "warning",
+      priority: 2,
+      module: "finance",
+      relatedLabel: riskyExcelImports[0].fileName
     });
   }
 
@@ -634,7 +709,8 @@ export async function answerBossQuestion(question: string, context: BossAiContex
     fleetAlerts: context.fleetAlerts.length,
     warehouseAlerts: context.warehouseAlerts.length,
     missions: context.openMissions.length,
-    reports: context.latestLockedReport ? 1 : 0
+    reports: context.latestLockedReport ? 1 : 0,
+    excelCostImports: context.excelCostImports.length
   };
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -701,6 +777,9 @@ function ruleBasedAnswer(question: string, context: BossAiContext) {
   } else if (lower.includes("vehicle") || lower.includes("fleet") || lower.includes("fuel")) {
     lines.push(highestFuel ? `- Highest fuel usage is ${highestFuel.vehicle}: ${highestFuel.fuel}.` : "- Fleet fuel data is missing.");
     lines.push(context.fleetAlerts.length ? `- There are ${context.fleetAlerts.length} fleet maintenance alerts in the current data.` : "- No fleet maintenance alerts are visible in the current data.");
+  } else if (lower.includes("excel") || lower.includes("import")) {
+    const latestImport = context.excelCostImports[0];
+    lines.push(latestImport ? `- Latest Excel site profitability import is ${latestImport.fileName}: ${latestImport.totalRows} rows, ${money(latestImport.totalCost)} total cost, ${money(latestImport.totalRevenue)} revenue, ${money(latestImport.totalProfitLoss)} profit/loss, ${latestImport.lossMakingSitesCount} loss-making sites, ${latestImport.duplicateRows} duplicates, ${latestImport.unmatchedRows} unmatched.` : "- No Excel Site Profitability Analyzer imports are available in the database.");
   } else {
     lines.push(`- Current month revenue is ${money(context.currentMonth.financial.totalRevenue)} and expenses are ${money(context.currentMonth.financial.totalExpenses)}.`);
     lines.push(`- Current month profit/loss is ${money(context.currentMonth.financial.totalProfit)} with ${context.currentMonth.financial.profitMargin}% margin.`);

@@ -123,6 +123,25 @@ enum AuditSeverity {
   CRITICAL
 }
 
+enum ExcelImportStatus {
+  UPLOADED
+  MAPPED
+  ANALYZED
+  APPROVED
+  REJECTED
+  IMPORTED
+}
+
+enum ExcelImportRowStatus {
+  PENDING
+  MATCHED
+  UNMATCHED
+  DUPLICATE
+  APPROVED
+  REJECTED
+  IMPORTED
+}
+
 model User {
   id                     String                  @id @default(cuid())
   name                   String
@@ -140,6 +159,8 @@ model User {
   locations              LocationUpdate[]
   projectAssignments     ProjectAssignment[]
   bossRoomLogs           BossRoomAccessLog[]
+  excelImportsUploaded   ExcelImport[]           @relation("ExcelImportUploader")
+  excelImportsApproved   ExcelImport[]           @relation("ExcelImportApprover")
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 }
@@ -202,10 +223,21 @@ model Team {
   id        String       @id @default(cuid())
   name      String
   leaderId  String?
+  driverId  String?
+  vehicleId String?
+  projectId String?
+  status    String       @default("AVAILABLE")
+  notes     String?
   members   TeamMember[]
   missions  Mission[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+  @@index([leaderId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([projectId])
+  @@index([status])
 }
 
 model TeamMember {
@@ -245,6 +277,8 @@ model Project {
   profitScenarios   ProfitScenario[]
   assignments       ProjectAssignment[]
   inviteAssignments InviteProjectAssignment[]
+  excelImportRows   ExcelImportRow[]
+  excelSiteCostRows ExcelSiteCostRow[]
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 }
@@ -581,6 +615,165 @@ model AuditLog {
   @@index([module, actionType])
   @@index([actorId, createdAt])
   @@index([projectId])
+}
+
+model ExcelImportProfile {
+  id             String        @id @default(cuid())
+  name           String        @unique
+  description    String?
+  mappingRules   Json?
+  sectionRules   Json?
+  salaryRules    Json?
+  allowanceRules Json?
+  categoryRules  Json?
+  imports        ExcelImport[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model ExcelImport {
+  id            String              @id @default(cuid())
+  fileName      String
+  filePath      String?
+  profileId     String?
+  profile       ExcelImportProfile? @relation(fields: [profileId], references: [id])
+  uploadedById  String
+  uploadedBy    User                @relation("ExcelImportUploader", fields: [uploadedById], references: [id])
+  uploadedAt    DateTime            @default(now())
+  approvedById  String?
+  approvedBy    User?               @relation("ExcelImportApprover", fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  status        ExcelImportStatus   @default(UPLOADED)
+  notes         String?
+  columnMapping Json?
+  sheets        ExcelImportSheet[]
+  rows          ExcelImportRow[]
+  siteRows      ExcelSiteCostRow[]
+  summary       ExcelImportSummary?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([profileId])
+  @@index([uploadedById])
+  @@index([approvedById])
+  @@index([status])
+  @@index([uploadedAt])
+}
+
+model ExcelImportSheet {
+  id               String      @id @default(cuid())
+  importId         String
+  import           ExcelImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  sheetName        String
+  selected         Boolean     @default(true)
+  rowCount         Int         @default(0)
+  headers          Json?
+  detectedSections Json?
+  createdAt        DateTime    @default(now())
+
+  @@unique([importId, sheetName])
+  @@index([importId])
+}
+
+model ExcelImportRow {
+  id               String               @id @default(cuid())
+  importId         String
+  import           ExcelImport          @relation(fields: [importId], references: [id], onDelete: Cascade)
+  sheetName        String
+  rowNumber        Int
+  rawData          Json
+  mappedData       Json?
+  siteId           String?
+  projectName      String?
+  matchedProjectId String?
+  matchedProject   Project?             @relation(fields: [matchedProjectId], references: [id])
+  category         String?
+  amount           Decimal?             @db.Decimal(14, 2)
+  date             DateTime?
+  status           ExcelImportRowStatus @default(PENDING)
+  redFlags         Json?
+  duplicateKey     String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([importId, status])
+  @@index([matchedProjectId])
+  @@index([siteId])
+  @@index([date])
+  @@index([duplicateKey])
+}
+
+model ExcelSiteCostRow {
+  id                  String               @id @default(cuid())
+  importId            String
+  import              ExcelImport          @relation(fields: [importId], references: [id], onDelete: Cascade)
+  sheetName           String
+  rowNumber           Int
+  siteId              String?
+  siteName            String?
+  projectName         String?
+  client              String?
+  region              String?
+  matchedProjectId    String?
+  matchedProject      Project?             @relation(fields: [matchedProjectId], references: [id])
+  teamName            String?
+  teamLeader          String?
+  workDays            Decimal?             @db.Decimal(10, 2)
+  technicianCount     Int?
+  fuelCost            Decimal              @default(0) @db.Decimal(14, 2)
+  highwayCost         Decimal              @default(0) @db.Decimal(14, 2)
+  salaryAllocatedCost Decimal              @default(0) @db.Decimal(14, 2)
+  dailyAllowanceCost  Decimal              @default(0) @db.Decimal(14, 2)
+  purchaseCost        Decimal              @default(0) @db.Decimal(14, 2)
+  materialCost        Decimal              @default(0) @db.Decimal(14, 2)
+  toolCost            Decimal              @default(0) @db.Decimal(14, 2)
+  vehicleCost         Decimal              @default(0) @db.Decimal(14, 2)
+  paperPrintingCost   Decimal              @default(0) @db.Decimal(14, 2)
+  otherCost           Decimal              @default(0) @db.Decimal(14, 2)
+  unknownCost         Decimal              @default(0) @db.Decimal(14, 2)
+  totalCost           Decimal              @default(0) @db.Decimal(14, 2)
+  revenue             Decimal?             @db.Decimal(14, 2)
+  profitLoss          Decimal?             @db.Decimal(14, 2)
+  marginPercent       Decimal?             @db.Decimal(8, 2)
+  profitabilityStatus String               @default("REVENUE_MISSING")
+  rawData             Json
+  mappedData          Json?
+  warnings            Json?
+  status              ExcelImportRowStatus @default(PENDING)
+  duplicateKey        String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([importId, status])
+  @@index([matchedProjectId])
+  @@index([siteId])
+  @@index([profitabilityStatus])
+  @@index([duplicateKey])
+}
+
+model ExcelImportSummary {
+  id                   String      @id @default(cuid())
+  importId             String      @unique
+  import               ExcelImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  totalRows            Int
+  validRows            Int
+  duplicateRows        Int
+  unmatchedRows        Int
+  totalAmount          Decimal     @default(0) @db.Decimal(14, 2)
+  totalCost            Decimal     @default(0) @db.Decimal(14, 2)
+  totalRevenue         Decimal     @default(0) @db.Decimal(14, 2)
+  totalProfitLoss      Decimal     @default(0) @db.Decimal(14, 2)
+  lossMakingSitesCount Int         @default(0)
+  profitableSitesCount Int         @default(0)
+  warningCount         Int         @default(0)
+  totalBySite          Json
+  totalByProject       Json
+  totalByCategory      Json
+  totalByTeam          Json?
+  lossMakingSites      Json?
+  redFlags             Json?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 }
 
 model BossRoomCredential {

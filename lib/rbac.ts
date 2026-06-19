@@ -37,6 +37,7 @@ export const navigation = [
   { href: "/warehouse", labelKey: "nav.warehouse", roles: ["BOSS", "GENERAL_MANAGER", "WAREHOUSE_MANAGER", "SUPER_ADMIN", "ADMIN"] },
   { href: "/fleet", labelKey: "nav.fleet", roles: ["BOSS", "GENERAL_MANAGER", "FLEET_MANAGER", "SUPER_ADMIN", "ADMIN"] },
   { href: "/imports", labelKey: "nav.imports", roles: ["BOSS", "GENERAL_MANAGER", "PROJECT_MANAGER", "FINANCIAL_DEPARTMENT", "FLEET_MANAGER", "WAREHOUSE_MANAGER", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
+  { href: "/excel-cost-analyzer", labelKey: "nav.excelCostAnalyzer", roles: ["BOSS", "GENERAL_MANAGER", "FINANCIAL_DEPARTMENT", "PROJECT_MANAGER", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { href: "/reports", labelKey: "nav.reports", roles: ["BOSS", "GENERAL_MANAGER", "PROJECT_MANAGER", "FINANCIAL_DEPARTMENT", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { href: "/audit-history", labelKey: "nav.auditHistory", roles: ["BOSS", "GENERAL_MANAGER", "PROJECT_MANAGER", "FINANCIAL_DEPARTMENT", "SUPER_ADMIN", "ADMIN", "ACCOUNTANT"] },
   { href: "/boss-room", labelKey: "nav.bossRoom", roles: ["BOSS"] },
