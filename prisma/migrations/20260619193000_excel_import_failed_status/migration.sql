@@ -1,0 +1,1 @@
+ALTER TYPE "ExcelImportStatus" ADD VALUE IF NOT EXISTS 'FAILED';

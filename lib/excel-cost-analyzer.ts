@@ -4,6 +4,15 @@ import path from "path";
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+const maxMeaningfulColumns = 80;
+const createManyBatchSize = 250;
+const debugExcelAnalyzer = process.env.EXCEL_ANALYZER_DEBUG === "1";
+const normalizeCache = new Map<string, string>();
+const fieldForHeaderCache = new Map<string, ExcelCostField | null>();
+const maxDbMoney = 999_999_999_999.99;
+const maxDbPercent = 999_999.99;
+const maxWorkDays = 10000;
+
 export const excelCostFields = [
   "siteId",
   "siteName",
@@ -169,15 +178,15 @@ const headerAliases: Record<ExcelCostField, string[]> = {
   projectName: ["project", "project name", "projet", "nom projet", "mission project"],
   client: ["client", "customer"],
   region: ["region", "city", "ville", "zone"],
-  date: ["date", "payment date", "expense date", "jour", "mois"],
-  teamName: ["team", "equipe", "crew"],
+  date: ["date", "la date", "payment date", "expense date", "jour", "mois"],
+  teamName: ["team", "workers", "equipe", "crew"],
   teamLeader: ["team leader", "chef equipe", "chef d equipe", "leader"],
-  employee: ["employee", "employe", "technician", "technicien", "person"],
-  category: ["category", "categorie", "type", "expense type", "nature"],
-  description: ["description", "details", "detail", "item", "article", "designation", "libelle", "observation"],
-  amount: ["amount", "montant", "cost", "cout", "prix", "total", "mad", "dh", "depense"],
-  revenue: ["revenue", "income", "prix vente", "ca", "chiffre affaire", "facture client", "contract value"],
-  workDays: ["work days", "days", "jours", "jours travailles", "nbr jours", "nb jours"],
+  employee: ["employee", "employe", "worker", "workers", "nom et prenom+depense", "nom et prenom depense", "technician", "technicien", "person"],
+  category: ["category", "categorie", "type", "type de site", "expense type", "nature", "title", "charge"],
+  description: ["description", "descreptions", "details", "detail", "item", "article", "designation", "libelle", "observation"],
+  amount: ["amount", "montant", "cost", "cout", "total cost", "totale depense", "total depense", "depense totale", "prix", "total", "mad", "dh", "depense"],
+  revenue: ["revenue", "income", "prix de site", "prix vente", "ca", "chiffre affaire", "facture client", "contract value"],
+  workDays: ["work days", "days", "jours", "n jours", "n° jours", "nº jours", "jours travailles", "nbr jours", "nb jours"],
   technicianCount: ["technicians", "techs", "technicien", "nbr techniciens", "nb tech", "team size"],
   monthlySalary: ["monthly salary", "salaire mensuel", "salaire"],
   teamMonthlySalary: ["team monthly salary", "salaire equipe", "total salaire equipe"],
@@ -191,15 +200,15 @@ const headerAliases: Record<ExcelCostField, string[]> = {
 };
 
 const categoryRules: Array<{ category: SiteCostCategory; terms: string[] }> = [
-  { category: "Fuel", terms: ["fuel", "gasoil", "diesel", "essence", "carburant", "station"] },
-  { category: "Highway", terms: ["peage", "péage", "autoroute", "toll", "highway"] },
-  { category: "Salary", terms: ["salary", "salaire", "paie", "payroll"] },
+  { category: "Fuel", terms: ["fuel", "gasoil", "gasoile", "diesel", "essence", "carburant", "station"] },
+  { category: "Highway", terms: ["peage", "péage", "jawaz", "autoroute", "toll", "highway"] },
+  { category: "Salary", terms: ["salary", "salaire", "paie", "payroll", "main d oeuvre", "main doeuvre"] },
   { category: "Daily allowance", terms: ["allowance", "indemnite", "indemnité", "per diem", "perdiem", "deplacement", "déplacement"] },
   { category: "Purchases", terms: ["purchase", "achat", "achats", "buy"] },
-  { category: "Materials", terms: ["material", "materiel", "matériel", "cable", "fiber", "fibre", "antenna", "antenne", "tube", "vis", "bolt", "connector"] },
-  { category: "Tools", terms: ["tool", "outil", "perceuse", "drill", "meter", "testeur", "ladder", "echelle", "échelle"] },
+  { category: "Materials", terms: ["material", "materiel", "matériel", "achat materiel", "achat matériel", "cable", "fiber", "fibre", "antenna", "antenne", "tube", "vis", "bolt", "connector"] },
+  { category: "Tools", terms: ["tool", "outil", "location materiel", "location matériel", "perceuse", "drill", "meter", "testeur", "ladder", "echelle", "échelle"] },
   { category: "Paper/printing", terms: ["copy", "copies", "photocopie", "impression", "printing", "papier", "print"] },
-  { category: "Vehicle", terms: ["vehicle", "vehicule", "véhicule", "voiture", "pneu", "vidange", "oil", "garage", "maintenance"] },
+  { category: "Vehicle", terms: ["vehicle", "vehicule", "véhicule", "voiture", "car", "rent car", "parking", "rocharge", "recharge", "pneu", "vidange", "oil", "garage", "maintenance"] },
   { category: "Supplier", terms: ["supplier", "fournisseur", "invoice", "facture", "vendor"] },
   { category: "Warehouse", terms: ["warehouse", "depot", "dépôt", "stock", "magasin"] },
   { category: "Miscellaneous", terms: ["misc", "miscellaneous", "divers", "autre", "other"] }
@@ -227,27 +236,49 @@ export async function createExcelCostImportFromFile(input: { file: File; userId:
   await writeFile(path.join(process.cwd(), relativePath), Buffer.from(await input.file.arrayBuffer()));
   await prisma.excelImport.update({ where: { id: created.id }, data: { filePath: relativePath } });
 
-  const result = await reprocessExcelCostImport(created.id);
-  return {
-    importId: created.id,
-    fileName: input.file.name,
-    sheetCount: result.sheetCount,
-    rowCount: result.rowCount
-  };
+  try {
+    const result = await reprocessExcelCostImport(created.id);
+    return {
+      importId: created.id,
+      fileName: input.file.name,
+      sheetCount: result.sheetCount,
+      rowCount: result.rowCount
+    };
+  } catch (error) {
+    await prisma.excelImport.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        notes: [input.notes, error instanceof Error ? error.message : "Excel analysis failed"].filter(Boolean).join("\n")
+      }
+    }).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function reprocessExcelCostImport(importId: string, options?: { selectedSheets?: string[]; columnMapping?: ExcelCostColumnMapping }) {
+  debugTime("excel:load-import");
   const existing = await prisma.excelImport.findUnique({ where: { id: importId }, include: { sheets: true, profile: true } });
+  debugTimeEnd("excel:load-import");
   if (!existing?.filePath) throw new Error("Import file was not found.");
 
+  debugTime("excel:load-workbook");
   const workbook = await loadWorkbookFromStoredPath(existing.filePath);
+  debugTimeEnd("excel:load-workbook");
+  debugTime("excel:load-projects");
   const projects = await prisma.project.findMany({ select: { id: true, name: true, client: true, region: true, siteId: true } });
+  debugTimeEnd("excel:load-projects");
   const selectedSheets = options?.selectedSheets ?? existing.sheets.filter((sheet) => sheet.selected).map((sheet) => sheet.sheetName);
   const mapping = options?.columnMapping ?? toColumnMapping(existing.columnMapping);
+  debugTime("excel:prepare-workbook");
   const prepared = prepareWorkbook(workbook, projects, selectedSheets.length ? selectedSheets : undefined, mapping);
+  debugTimeEnd("excel:prepare-workbook");
   const rows = prepared.flatMap((sheet) => sheet.rows);
+  debugTime("excel:summarize");
   const summary = summarizePreparedRows(rows);
+  debugTimeEnd("excel:summarize");
 
+  debugTime("excel:write-db");
   await prisma.$transaction(async (tx) => {
     await tx.excelImportRow.deleteMany({ where: { importId } });
     await tx.excelSiteCostRow.deleteMany({ where: { importId } });
@@ -267,13 +298,15 @@ export async function reprocessExcelCostImport(importId: string, options?: { sel
       });
     }
 
-    if (rows.length) {
-      await tx.excelSiteCostRow.createMany({ data: rows.map((row) => ({ importId, ...row })) });
+    for (let index = 0; index < rows.length; index += createManyBatchSize) {
+      const batch = rows.slice(index, index + createManyBatchSize);
+      await tx.excelSiteCostRow.createMany({ data: batch.map((row) => ({ importId, ...row })) });
     }
 
     await tx.excelImportSummary.create({ data: { importId, ...summary } });
     await tx.excelImport.update({ where: { id: importId }, data: { status: "ANALYZED", columnMapping: mapping } });
-  });
+  }, { maxWait: 10000, timeout: 60000 });
+  debugTimeEnd("excel:write-db");
 
   return { sheetCount: prepared.length, rowCount: rows.length };
 }
@@ -369,7 +402,7 @@ function prepareSheet(sheet: ExcelJS.Worksheet, projects: ProjectMatch[], manual
     }
 
     const headerCandidate = headersFromRow(row);
-    const headerScore = Array.from(headerCandidate.values()).filter((header) => fieldForHeader(header)).length;
+    const headerScore = Array.from(headerCandidate.values()).filter((header) => exactFieldForHeader(header)).length;
     if (headerScore >= 2) {
       activeHeaders = headerCandidate;
       activeMapping = { ...mappingFromHeaders(activeHeaders), ...manualMapping };
@@ -390,7 +423,7 @@ function prepareSheet(sheet: ExcelJS.Worksheet, projects: ProjectMatch[], manual
     const category = classifyCategory([mapped.category, mapped.description, mapped.supplier, activeSection?.title].filter(Boolean).join(" "));
     const amount = parseAmount(mapped.amount);
     const revenue = parseAmount(mapped.revenue);
-    const workDays = parsePositiveNumber(mapped.workDays);
+    const workDays = clampOptional(parsePositiveNumber(mapped.workDays), maxWorkDays);
     const technicianCount = parseInteger(mapped.technicianCount);
     const monthlySalary = parseAmount(mapped.monthlySalary);
     const teamMonthlySalary = parseAmount(mapped.teamMonthlySalary);
@@ -404,7 +437,7 @@ function prepareSheet(sheet: ExcelJS.Worksheet, projects: ProjectMatch[], manual
     const costs = buildCostBreakdown({ category, amount, monthlySalary, teamMonthlySalary, totalWorkedDays, workDays, technicianCount, allowanceRate, existingAllowance });
     const totalCost = roundMoney(Object.values(costs).reduce((sum, value) => sum + value, 0));
     const profitLoss = revenue == null ? null : roundMoney(revenue - totalCost);
-    const marginPercent = revenue == null || revenue === 0 ? null : roundMoney((profitLoss! / revenue) * 100);
+    const marginPercent = revenue == null || revenue === 0 ? null : clampOptional(roundMoney((profitLoss! / revenue) * 100), maxDbPercent);
     const warnings = buildWarnings({ mapped, match, category, amount, revenue, workDays, technicianCount, costs, existingAllowance, allowanceRate, totalCost, profitLoss, marginPercent });
     const profitabilityStatus = revenue == null ? "REVENUE_MISSING" : profitLoss! < 0 ? "LOSS_MAKING" : marginPercent! < 10 ? "RISKY" : "PROFITABLE";
 
@@ -422,9 +455,9 @@ function prepareSheet(sheet: ExcelJS.Worksheet, projects: ProjectMatch[], manual
       workDays,
       technicianCount,
       ...costs,
-      totalCost,
-      revenue,
-      profitLoss,
+      totalCost: clampNumber(totalCost, maxDbMoney),
+      revenue: clampOptional(revenue, maxDbMoney),
+      profitLoss: clampOptional(profitLoss, maxDbMoney),
       marginPercent,
       profitabilityStatus,
       rawData,
@@ -456,7 +489,7 @@ function fallbackParseSheetRows(sheet: ExcelJS.Worksheet, projects: ProjectMatch
   sheet.eachRow((row, rowNumber) => {
     if (sectionRows.has(rowNumber)) return;
     const candidate = headersFromRow(row);
-    const score = Array.from(candidate.values()).filter((header) => fieldForHeader(header)).length;
+    const score = Array.from(candidate.values()).filter((header) => exactFieldForHeader(header)).length;
     if (score > bestScore && candidate.size >= 2) {
       bestHeaders = candidate;
       bestHeaderRow = rowNumber;
@@ -469,7 +502,7 @@ function fallbackParseSheetRows(sheet: ExcelJS.Worksheet, projects: ProjectMatch
   const rows: PreparedSiteCostRow[] = [];
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber <= bestHeaderRow || sectionRows.has(rowNumber)) return;
-    const candidateScore = Array.from(headersFromRow(row).values()).filter((header) => fieldForHeader(header)).length;
+    const candidateScore = Array.from(headersFromRow(row).values()).filter((header) => exactFieldForHeader(header)).length;
     if (candidateScore >= 2) return;
     const rawData: Record<string, string> = {};
     bestHeaders.forEach((header, columnIndex) => {
@@ -495,7 +528,7 @@ function buildPreparedSiteCostRow(input: {
   const category = classifyCategory([mapped.category, mapped.description, mapped.supplier, input.sectionTitle].filter(Boolean).join(" "));
   const amount = parseAmount(mapped.amount);
   const revenue = parseAmount(mapped.revenue);
-  const workDays = parsePositiveNumber(mapped.workDays);
+  const workDays = clampOptional(parsePositiveNumber(mapped.workDays), maxWorkDays);
   const technicianCount = parseInteger(mapped.technicianCount);
   const monthlySalary = parseAmount(mapped.monthlySalary);
   const teamMonthlySalary = parseAmount(mapped.teamMonthlySalary);
@@ -509,7 +542,7 @@ function buildPreparedSiteCostRow(input: {
   const costs = buildCostBreakdown({ category, amount, monthlySalary, teamMonthlySalary, totalWorkedDays, workDays, technicianCount, allowanceRate, existingAllowance });
   const totalCost = roundMoney(Object.values(costs).reduce((sum, value) => sum + value, 0));
   const profitLoss = revenue == null ? null : roundMoney(revenue - totalCost);
-  const marginPercent = revenue == null || revenue === 0 ? null : roundMoney((profitLoss! / revenue) * 100);
+  const marginPercent = revenue == null || revenue === 0 ? null : clampOptional(roundMoney((profitLoss! / revenue) * 100), maxDbPercent);
   const warnings = buildWarnings({ mapped, match, category, amount, revenue, workDays, technicianCount, costs, existingAllowance, allowanceRate, totalCost, profitLoss, marginPercent });
   const profitabilityStatus = revenue == null ? "REVENUE_MISSING" : profitLoss! < 0 ? "LOSS_MAKING" : marginPercent! < 10 ? "RISKY" : "PROFITABLE";
 
@@ -527,9 +560,9 @@ function buildPreparedSiteCostRow(input: {
     workDays,
     technicianCount,
     ...costs,
-    totalCost,
-    revenue,
-    profitLoss,
+    totalCost: clampNumber(totalCost, maxDbMoney),
+    revenue: clampOptional(revenue, maxDbMoney),
+    profitLoss: clampOptional(profitLoss, maxDbMoney),
     marginPercent,
     profitabilityStatus,
     rawData: input.rawData,
@@ -556,7 +589,7 @@ function detectSections(sheet: ExcelJS.Worksheet): DetectedSection[] {
 
   sheet.eachRow((row, rowNumber) => {
     const uniqueCells = new Set<string>();
-    row.eachCell((cell) => {
+    eachMeaningfulCell(row, (cell) => {
       const text = cellText(cell.value);
       if (text) uniqueCells.add(text);
     });
@@ -596,17 +629,17 @@ function buildCostBreakdown(input: {
   const dailyAllowanceCost = input.existingAllowance ?? (input.category === "Daily allowance" && amount ? amount : expectedAllowance);
 
   return {
-    fuelCost: input.category === "Fuel" ? amount : 0,
-    highwayCost: input.category === "Highway" ? amount : 0,
-    salaryAllocatedCost,
-    dailyAllowanceCost,
-    purchaseCost: input.category === "Purchases" ? amount : 0,
-    materialCost: input.category === "Materials" || input.category === "Warehouse" ? amount : 0,
-    toolCost: input.category === "Tools" ? amount : 0,
-    vehicleCost: input.category === "Vehicle" ? amount : 0,
-    paperPrintingCost: input.category === "Paper/printing" ? amount : 0,
-    otherCost: input.category === "Miscellaneous" || input.category === "Supplier" ? amount : 0,
-    unknownCost: input.category === "Unknown" ? amount : 0
+    fuelCost: clampNumber(input.category === "Fuel" ? amount : 0, maxDbMoney),
+    highwayCost: clampNumber(input.category === "Highway" ? amount : 0, maxDbMoney),
+    salaryAllocatedCost: clampNumber(salaryAllocatedCost, maxDbMoney),
+    dailyAllowanceCost: clampNumber(dailyAllowanceCost, maxDbMoney),
+    purchaseCost: clampNumber(input.category === "Purchases" ? amount : 0, maxDbMoney),
+    materialCost: clampNumber(input.category === "Materials" || input.category === "Warehouse" ? amount : 0, maxDbMoney),
+    toolCost: clampNumber(input.category === "Tools" ? amount : 0, maxDbMoney),
+    vehicleCost: clampNumber(input.category === "Vehicle" ? amount : 0, maxDbMoney),
+    paperPrintingCost: clampNumber(input.category === "Paper/printing" ? amount : 0, maxDbMoney),
+    otherCost: clampNumber(input.category === "Miscellaneous" || input.category === "Supplier" ? amount : 0, maxDbMoney),
+    unknownCost: clampNumber(input.category === "Unknown" ? amount : 0, maxDbMoney)
   };
 }
 
@@ -734,28 +767,51 @@ async function loadWorkbookFromStoredPath(relativePath: string) {
 
 function headersFromRow(row: ExcelJS.Row) {
   const headers = new Map<number, string>();
-  row.eachCell((cell, columnIndex) => {
+  eachMeaningfulCell(row, (cell, columnIndex) => {
     const header = cellText(cell.value);
     if (header) headers.set(columnIndex, header);
   });
   return headers;
 }
 
+function eachMeaningfulCell(row: ExcelJS.Row, callback: (cell: ExcelJS.Cell, columnIndex: number) => void) {
+  const lastColumn = Math.min(maxMeaningfulColumns, row.cellCount || maxMeaningfulColumns);
+  for (let columnIndex = 1; columnIndex <= lastColumn; columnIndex += 1) {
+    const cell = row.getCell(columnIndex);
+    if (cell.value !== null && cell.value !== undefined && cell.value !== "") callback(cell, columnIndex);
+  }
+}
+
 function mappingFromHeaders(headers: Map<number, string>): ExcelCostColumnMapping {
   const mapping: ExcelCostColumnMapping = {};
   headers.forEach((header) => {
     const field = fieldForHeader(header);
-    if (field && !mapping[field]) mapping[field] = header;
+    if (!field) return;
+    if (!mapping[field] || isPreferredHeader(field, header, mapping[field])) mapping[field] = header;
   });
   return mapping;
 }
 
+function isPreferredHeader(field: ExcelCostField, candidate: string, current: string) {
+  if (field !== "amount") return false;
+  const candidateNorm = normalize(candidate);
+  const currentNorm = normalize(current);
+  const candidateIsTotal = candidateNorm.includes("total") || candidateNorm.includes("totale");
+  const currentIsTotal = currentNorm.includes("total") || currentNorm.includes("totale");
+  return candidateIsTotal && !currentIsTotal;
+}
+
 function mapRawRow(rawData: Record<string, string>, mapping: ExcelCostColumnMapping) {
+  const rawHeaders = Object.keys(rawData);
+  const rawByNormalized = new Map(rawHeaders.map((header) => [normalize(header), header]));
+  const rawByField = new Map<ExcelCostField, string>();
+  for (const header of rawHeaders) {
+    const field = fieldForHeader(header);
+    if (field && !rawByField.has(field)) rawByField.set(field, header);
+  }
   return excelCostFields.reduce<Record<ExcelCostField, string>>((mapped, field) => {
     const manualHeader = mapping[field];
-    const matchedHeader = manualHeader
-      ? Object.keys(rawData).find((header) => normalize(header) === normalize(manualHeader))
-      : Object.keys(rawData).find((header) => fieldForHeader(header) === field);
+    const matchedHeader = manualHeader ? rawByNormalized.get(normalize(manualHeader)) : rawByField.get(field);
     mapped[field] = matchedHeader ? rawData[matchedHeader].trim() : "";
     return mapped;
   }, {} as Record<ExcelCostField, string>);
@@ -763,13 +819,24 @@ function mapRawRow(rawData: Record<string, string>, mapping: ExcelCostColumnMapp
 
 function fieldForHeader(header: string): ExcelCostField | undefined {
   const normalized = normalize(header);
-  const exact = excelCostFields.find((field) => headerAliases[field].some((alias) => normalize(alias) === normalized));
-  if (exact) return exact;
-  return excelCostFields.find((field) => headerAliases[field].some((alias) => {
+  if (fieldForHeaderCache.has(normalized)) return fieldForHeaderCache.get(normalized) ?? undefined;
+  const exact = exactFieldForHeader(header);
+  if (exact) {
+    fieldForHeaderCache.set(normalized, exact);
+    return exact;
+  }
+  const fuzzy = excelCostFields.find((field) => headerAliases[field].some((alias) => {
     const normalizedAlias = normalize(alias);
     if (normalizedAlias.length <= 4) return false;
     return normalized.includes(normalizedAlias);
   }));
+  fieldForHeaderCache.set(normalized, fuzzy ?? null);
+  return fuzzy;
+}
+
+function exactFieldForHeader(header: string): ExcelCostField | undefined {
+  const normalized = normalize(header);
+  return excelCostFields.find((field) => headerAliases[field].some((alias) => normalize(alias) === normalized));
 }
 
 function classifyCategory(value: string): SiteCostCategory {
@@ -834,7 +901,9 @@ function cellText(value: ExcelJS.CellValue) {
   if (value === null || value === undefined) return "";
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "object" && "text" in value) return String(value.text ?? "").trim();
-  if (typeof value === "object" && "result" in value) return String(value.result ?? "").trim();
+  if (typeof value === "object" && "result" in value) return cellText(value.result as ExcelJS.CellValue);
+  if (typeof value === "object" && "formula" in value) return "";
+  if (typeof value === "object" && "sharedFormula" in value) return "";
   if (typeof value === "object" && "richText" in value) return ((value as { richText?: Array<{ text?: string }> }).richText ?? []).map((part) => part.text ?? "").join("").trim();
   return String(value).trim();
 }
@@ -842,6 +911,14 @@ function cellText(value: ExcelJS.CellValue) {
 function buildDuplicateKey(input: { siteId: string; projectName: string; amount: number; description: string }) {
   if ((!input.siteId && !input.projectName) || !input.description || !input.amount) return null;
   return normalize([input.siteId || input.projectName, input.amount.toFixed(2), input.description].join("|"));
+}
+
+function debugTime(label: string) {
+  if (debugExcelAnalyzer) console.time(label);
+}
+
+function debugTimeEnd(label: string) {
+  if (debugExcelAnalyzer) console.timeEnd(label);
 }
 
 function toColumnMapping(value: unknown): ExcelCostColumnMapping {
@@ -866,14 +943,27 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function clampNumber(value: number, max: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-max, Math.min(max, roundMoney(value)));
+}
+
+function clampOptional(value: number | null, max: number) {
+  return value == null ? null : clampNumber(value, max);
+}
+
 function normalize(value: string) {
-  return value
+  const cached = normalizeCache.get(value);
+  if (cached !== undefined) return cached;
+  const normalized = value
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_-]/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  normalizeCache.set(value, normalized);
+  return normalized;
 }
 
 function sanitizeFileName(value: string) {

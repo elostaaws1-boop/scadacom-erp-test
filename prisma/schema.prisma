@@ -130,6 +130,7 @@ enum ExcelImportStatus {
   APPROVED
   REJECTED
   IMPORTED
+  FAILED
 }
 
 enum ExcelImportRowStatus {
