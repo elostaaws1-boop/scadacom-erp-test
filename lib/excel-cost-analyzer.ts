@@ -75,6 +75,7 @@ export type ExcelCostUploadResult = {
   fileName: string;
   sheetCount: number;
   rowCount: number;
+  status: "UPLOADED" | "PROCESSING" | "ANALYZED" | "FAILED";
 };
 
 type ProjectMatch = {
@@ -214,7 +215,7 @@ const categoryRules: Array<{ category: SiteCostCategory; terms: string[] }> = [
   { category: "Miscellaneous", terms: ["misc", "miscellaneous", "divers", "autre", "other"] }
 ];
 
-export async function createExcelCostImportFromFile(input: { file: File; userId: string; notes?: string }): Promise<ExcelCostUploadResult> {
+export async function createExcelCostImportFromFile(input: { file: File; userId: string; notes?: string; analyzeImmediately?: boolean }): Promise<ExcelCostUploadResult> {
   const extension = path.extname(input.file.name).toLowerCase();
   if (extension !== ".xlsx") throw new Error("Upload a modern .xlsx Excel file. If your file is .xls, open it in Excel and Save As .xlsx first.");
   if (input.file.size > 20 * 1024 * 1024) throw new Error("Excel file is too large. Keep uploads under 20 MB.");
@@ -236,20 +237,38 @@ export async function createExcelCostImportFromFile(input: { file: File; userId:
   await writeFile(path.join(process.cwd(), relativePath), Buffer.from(await input.file.arrayBuffer()));
   await prisma.excelImport.update({ where: { id: created.id }, data: { filePath: relativePath } });
 
-  try {
-    const result = await reprocessExcelCostImport(created.id);
+  if (input.analyzeImmediately === false) {
     return {
       importId: created.id,
       fileName: input.file.name,
+      sheetCount: 0,
+      rowCount: 0,
+      status: "UPLOADED"
+    };
+  }
+
+  return analyzeExcelCostImportSafely(created.id, input.file.name, input.notes);
+}
+
+export async function analyzeExcelCostImportSafely(importId: string, fileName?: string, notes?: string): Promise<ExcelCostUploadResult> {
+  await prisma.excelImport.update({ where: { id: importId }, data: { status: "PROCESSING" } }).catch(() => undefined);
+
+  try {
+    const existing = fileName ? null : await prisma.excelImport.findUnique({ where: { id: importId }, select: { fileName: true } });
+    const result = await reprocessExcelCostImport(importId);
+    return {
+      importId,
+      fileName: fileName ?? existing?.fileName ?? "Excel import",
       sheetCount: result.sheetCount,
-      rowCount: result.rowCount
+      rowCount: result.rowCount,
+      status: "ANALYZED"
     };
   } catch (error) {
     await prisma.excelImport.update({
-      where: { id: created.id },
+      where: { id: importId },
       data: {
         status: "FAILED",
-        notes: [input.notes, error instanceof Error ? error.message : "Excel analysis failed"].filter(Boolean).join("\n")
+        notes: [notes, error instanceof Error ? error.message : "Excel analysis failed"].filter(Boolean).join("\n")
       }
     }).catch(() => undefined);
     throw error;

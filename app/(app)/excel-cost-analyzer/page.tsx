@@ -9,7 +9,8 @@ import {
   assignExcelCostRowProject,
   rejectExcelCostImport,
   remapExcelCostColumns,
-  selectExcelCostSheets
+  selectExcelCostSheets,
+  startExcelCostAnalysis
 } from "@/app/actions";
 import { projectIdsForUser } from "@/lib/access";
 import {
@@ -157,6 +158,27 @@ export default async function ExcelCostAnalyzerPage({ searchParams }: PageProps)
                 This import did not finish, but the application stayed stable. Upload the file again after the latest deploy finishes, or use a smaller selected sheet set.
               </p>
               {selectedImport.notes ? <p className="mt-3 rounded-md bg-white/70 p-3 font-mono text-xs">{selectedImport.notes}</p> : null}
+              {canManage ? (
+                <form action={startExcelCostAnalysis} className="mt-4">
+                  <input type="hidden" name="importId" value={selectedImport.id} />
+                  <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">Retry analysis</button>
+                </form>
+              ) : null}
+            </section>
+          ) : null}
+
+          {["UPLOADED", "PROCESSING"].includes(selectedImport.status) ? (
+            <section className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950 shadow-sm">
+              <h2 className="text-lg font-semibold">{selectedImport.status === "PROCESSING" ? "Analysis is processing" : "Analysis is queued"}</h2>
+              <p className="mt-2">
+                Large SCADACOM workbooks are processed in the background so the browser does not crash. Refresh this page after a short moment to see the organized site/project costs.
+              </p>
+              {canManage ? (
+                <form action={startExcelCostAnalysis} className="mt-4">
+                  <input type="hidden" name="importId" value={selectedImport.id} />
+                  <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">Start or retry analysis</button>
+                </form>
+              ) : null}
             </section>
           ) : null}
 

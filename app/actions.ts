@@ -15,6 +15,7 @@ import { allowanceRateToMad, canSpendProject, isForbiddenFieldExpense, missionDa
 import {
   canApproveExcelCostImport,
   canManageExcelCostAnalyzer,
+  analyzeExcelCostImportSafely,
   createExcelCostImportFromFile,
   excelCostFields,
   rebuildExcelCostSummary,
@@ -946,7 +947,15 @@ export async function uploadExcelCostFile(_previous: ExcelCostAnalyzerState, for
     const result = await createExcelCostImportFromFile({
       file,
       userId: user.id,
-      notes: text(formData, "notes")
+      notes: text(formData, "notes"),
+      analyzeImmediately: false
+    });
+
+    void analyzeExcelCostImportSafely(result.importId, result.fileName, text(formData, "notes")).catch((error) => {
+      console.error("Excel cost analysis failed", {
+        importId: result.importId,
+        error: error instanceof Error ? error.message : error
+      });
     });
 
     await audit({
@@ -962,7 +971,7 @@ export async function uploadExcelCostFile(_previous: ExcelCostAnalyzerState, for
     return {
       ok: true,
       importId: result.importId,
-      message: `${result.fileName} analyzed: ${result.sheetCount} sheet(s), ${result.rowCount} row(s).`
+      message: `${result.fileName} uploaded. Analysis is processing in the background; open the analysis page and refresh after a moment.`
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Excel analysis failed." };
@@ -985,6 +994,35 @@ export async function selectExcelCostSheets(formData: FormData) {
     after: { selectedSheets },
     financialAction: true
   });
+  revalidatePath("/excel-cost-analyzer");
+  redirect(`/excel-cost-analyzer?importId=${importId}`);
+}
+
+export async function startExcelCostAnalysis(formData: FormData) {
+  const user = await currentUser();
+  if (!canManageExcelCostAnalyzer(user.role)) throw new Error("Not allowed");
+  const importId = text(formData, "importId");
+  const excelImport = await prisma.excelImport.findUnique({
+    where: { id: importId },
+    select: { id: true, fileName: true, notes: true }
+  });
+  if (!excelImport) throw new Error("Excel import was not found.");
+
+  void analyzeExcelCostImportSafely(excelImport.id, excelImport.fileName, excelImport.notes ?? undefined).catch((error) => {
+    console.error("Excel cost analysis failed", {
+      importId: excelImport.id,
+      error: error instanceof Error ? error.message : error
+    });
+  });
+
+  await audit({
+    actorId: user.id,
+    action: "START_EXCEL_COST_ANALYSIS",
+    entity: "ExcelImport",
+    entityId: importId,
+    financialAction: true
+  });
+
   revalidatePath("/excel-cost-analyzer");
   redirect(`/excel-cost-analyzer?importId=${importId}`);
 }

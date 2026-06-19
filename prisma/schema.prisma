@@ -125,6 +125,7 @@ enum AuditSeverity {
 
 enum ExcelImportStatus {
   UPLOADED
+  PROCESSING
   MAPPED
   ANALYZED
   APPROVED
